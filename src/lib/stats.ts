@@ -1,5 +1,5 @@
 import { KEYS, bookItems, pischnaLabel, relativeMinor, scaleQueue, type Book, type Key } from '../data/exercises'
-import type { Entry, RoutineItem, TodayKeyMode } from './db'
+import type { Entry, RoutineItem, Settings } from './db'
 import { addDays, dateKey, dayIndex } from './time'
 
 export function secondsOn(entries: Entry[], day: string) {
@@ -72,9 +72,13 @@ export function coverage(s: ExerciseStat | undefined) {
   return s ? Object.keys(s.keys).length : 0
 }
 
-/** 오늘의 조: 5도권 하루 한 조 순환, 또는 하농 전체에서 가장 오래 안 친 조 */
-export function todayKey(mode: TodayKeyMode, entries: Entry[], date = new Date()): Key {
-  if (mode === 'cycle') return KEYS[dayIndex(date) % 12]
+export type KeyPrefs = Pick<Settings, 'todayKeyMode' | 'fixedKey' | 'keyOverride'>
+
+/** 오늘의 조: 오늘만 고른 조 → 직접 고른 조 → 5도권 하루 한 조 순환 → 하농에서 가장 오래 안 친 조 */
+export function todayKey(prefs: KeyPrefs, entries: Entry[], date = new Date()): Key {
+  if (prefs.keyOverride?.date === dateKey(date)) return prefs.keyOverride.key
+  if (prefs.todayKeyMode === 'fixed') return prefs.fixedKey
+  if (prefs.todayKeyMode === 'cycle') return KEYS[dayIndex(date) % 12]
   const last = new Map<Key, string>()
   for (const e of entries) {
     if (e.refType !== 'hanon' || !e.key) continue
@@ -93,8 +97,14 @@ export function todayKey(mode: TodayKeyMode, entries: Entry[], date = new Date()
   return pick
 }
 
-export function nextKeyLabel(mode: TodayKeyMode) {
-  return mode === 'cycle' ? `5도권 순환 · 내일 ${KEYS[(dayIndex() + 1) % 12]}` : '가장 오래 안 친 조'
+export function keyOverridden(prefs: KeyPrefs) {
+  return prefs.keyOverride?.date === dateKey()
+}
+
+export function nextKeyLabel(prefs: KeyPrefs) {
+  if (keyOverridden(prefs)) return '오늘만 직접 고름 · 내일은 자동'
+  if (prefs.todayKeyMode === 'fixed') return '직접 고른 조'
+  return prefs.todayKeyMode === 'cycle' ? `5도권 순환 · 내일 ${KEYS[(dayIndex() + 1) % 12]}` : '가장 오래 안 친 조'
 }
 
 // ── 루틴 ──

@@ -6,6 +6,7 @@ import { useEntries, useSettings } from '../lib/hooks'
 import { coverage, exerciseStats, todayKey, type ExerciseStat } from '../lib/stats'
 import { agoLabel, daysAgo } from '../lib/time'
 import { useNav } from '../nav'
+import { KeySheet } from './KeySheet'
 
 const MIX = [0, 16, 32, 50, 72, 100]
 const level = (b: number) => (!b ? 0 : b < 76 ? 1 : b < 88 ? 2 : b < 100 ? 3 : b < 112 ? 4 : 5)
@@ -63,7 +64,8 @@ function ScaleMatrix() {
   const entries = useEntries()
   const settings = useSettings()
   const stats = useMemo(() => exerciseStats(entries, 'scale'), [entries])
-  const key = todayKey(settings.todayKeyMode, entries)
+  const key = todayKey(settings, entries)
+  const [pickKey, setPickKey] = useState(false)
   const COLS: { label: string; kind: 0 | 1; minor: boolean }[] = [
     { label: '장조 스케일', kind: 0, minor: false },
     { label: '장조 아르페지오', kind: 1, minor: false },
@@ -75,10 +77,10 @@ function ScaleMatrix() {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0 20px' }}>
-        <div style={{ height: 48, padding: '0 16px', borderRadius: 12, border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button className="tap" onClick={() => setPickKey(true)} style={{ height: 48, padding: '0 16px', borderRadius: 12, border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink2)' }}>오늘의 조</span>
           <span className="serif" style={{ fontSize: 20, fontWeight: 600, color: 'var(--accentText)' }}>{key} / {MINORS[KEYS.indexOf(key)]}</span>
-        </div>
+        </button>
         <span className="caption">{touched} / 48칸 연습함</span>
         <button className="btn primary sm" style={{ marginLeft: 'auto', height: 48 }} onClick={() => nav.startPractice({ refType: 'scale', queue: scaleQueue(key) })}>
           <PlayIcon size={18} /> 오늘의 조 4개
@@ -121,6 +123,7 @@ function ScaleMatrix() {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid var(--alert)' }} />14일 이상 안 침</span>
         <span>칸 색 = 최고 클린 BPM</span>
       </div>
+      {pickKey && <KeySheet onClose={() => setPickKey(false)} />}
     </>
   )
 }
@@ -131,8 +134,9 @@ export function Basics() {
   const settings = useSettings()
   const [book, setBook] = useState<ScoreBook | 'scale'>('hanon')
   const [mode, setMode] = useState<'bpm' | 'cov'>('bpm')
+  const [pickKey, setPickKey] = useState(false)
   const stats = useMemo(() => (book === 'scale' ? new Map<number, ExerciseStat>() : exerciseStats(entries, book)), [entries, book])
-  const key = todayKey(settings.todayKeyMode, entries)
+  const key = todayKey(settings, entries)
   const items = book === 'scale' ? [] : bookItems(book, settings.pischnaSplits)
 
   return (
@@ -152,10 +156,10 @@ export function Basics() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0 24px' }}>
               {book === 'hanon' ? (
                 <>
-                  <div style={{ height: 48, padding: '0 16px', borderRadius: 12, border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button className="tap" onClick={() => setPickKey(true)} style={{ height: 48, padding: '0 16px', borderRadius: 12, border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink2)' }}>오늘의 조</span>
                     <span className="serif" style={{ fontSize: 20, fontWeight: 600, color: 'var(--accentText)' }}>{key}</span>
-                  </div>
+                  </button>
                   <span className="caption">21–30번 · 12조 완료 {items.filter(it => coverage(stats.get(it.no)) === 12).length} / {items.length}</span>
                   <div style={{ marginLeft: 'auto' }}>
                     <Segmented value={mode} onChange={setMode} options={[{ value: 'bpm', label: 'BPM 보기' }, { value: 'cov', label: '조 커버리지' }]} />
@@ -186,6 +190,7 @@ export function Basics() {
           </>
         )}
       </div>
+      {pickKey && <KeySheet onClose={() => setPickKey(false)} />}
     </div>
   )
 }

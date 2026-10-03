@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BOOK_NAME, PISCHNA_SIZE, bookItems, type ScoreBook } from '../data/exercises'
+import { BOOK_NAME, KEYS, PISCHNA_SIZE, bookItems, type ScoreBook } from '../data/exercises'
 import { Icon } from '../components/Icon'
 import { Segmented, Sheet, SheetHead, useToast } from '../components/ui'
 import { db, saveSetting, type BookMap } from '../lib/db'
@@ -58,9 +58,18 @@ export function SettingsPage() {
           <Row label="하루 목표 시간">
             <Segmented value={s.dailyGoalMin} onChange={v => saveSetting('dailyGoalMin', v)} options={[60, 120, 180, 240, 300].map(m => ({ value: m, label: `${m / 60}시간` }))} />
           </Row>
-          <Row label="오늘의 조" sub="하농 조옮김 기준">
-            <Segmented value={s.todayKeyMode} onChange={v => saveSetting('todayKeyMode', v)} options={[{ value: 'cycle', label: '5도권 순환' }, { value: 'stale', label: '오래 안 친 조' }]} />
+          <Row label="오늘의 조" sub="하농 조옮김·스케일 기준 · 「오늘」에서 오늘만 바꿀 수도 있어요">
+            <Segmented value={s.todayKeyMode} onChange={v => saveSetting('todayKeyMode', v)} options={[{ value: 'cycle', label: '5도권 순환' }, { value: 'stale', label: '오래 안 친 조' }, { value: 'fixed', label: '직접 고르기' }]} />
           </Row>
+          {s.todayKeyMode === 'fixed' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 6, padding: '12px 0 14px', borderBottom: '1px solid var(--line)' }}>
+              {KEYS.map(k => (
+                <button key={k} className={`keychip tap${s.fixedKey === k ? ' on' : ''}`} style={{ height: 52, fontSize: 17 }} onClick={() => saveSetting('fixedKey', k)}>
+                  {k}
+                </button>
+              ))}
+            </div>
+          )}
           <Row label="하루 복습 구간" sub="오늘 할 구간 추천 최대 개수">
             <Segmented value={s.dailyReviewMax} onChange={v => saveSetting('dailyReviewMax', v)} options={[4, 6, 8, 10].map(n => ({ value: n, label: `${n}개` }))} />
           </Row>

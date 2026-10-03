@@ -183,7 +183,8 @@ db.version(2).stores({
 
 // ── 설정 ──
 
-export type TodayKeyMode = 'cycle' | 'stale'
+/** 오늘의 조: 5도권 순환 / 오래 안 친 조 / 직접 고른 조 */
+export type TodayKeyMode = 'cycle' | 'stale' | 'fixed'
 export type Theme = 'system' | 'dark' | 'light'
 
 export interface BookMap {
@@ -194,6 +195,8 @@ export interface BookMap {
 export interface Settings {
   dailyGoalMin: number
   todayKeyMode: TodayKeyMode
+  fixedKey: Key // '직접 고르기'일 때의 조
+  keyOverride: { date: string; key: Key } | null // 오늘만 바꾼 조
   theme: Theme
   ladderStep: number
   hanonBook: BookMap
@@ -205,6 +208,8 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   dailyGoalMin: 180,
   todayKeyMode: 'cycle',
+  fixedKey: 'C',
+  keyOverride: null,
   theme: 'system',
   ladderStep: 4,
   hanonBook: { scoreId: null, pages: {} },

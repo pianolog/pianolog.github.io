@@ -328,7 +328,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           title={title}
           refType={target.refType}
           seconds={itemSec}
-          todayKey={target.refType === 'hanon' ? todayKey(settings.todayKeyMode, entries) : undefined}
+          todayKey={target.refType === 'hanon' ? todayKey(settings, entries) : undefined}
           variations={varList}
           initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key: target.refType === 'scale' ? undefined : key, hands: lastHands.current, variations: lastVars.current.filter(v => varList.includes(v)), rating: 0, memo: '' }}
           nextLabel={nextLabel}

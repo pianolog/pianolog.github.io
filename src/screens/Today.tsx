@@ -10,6 +10,7 @@ import { TAG_STYLE } from './rep/PieceDetail'
 import { clock, dateKey, duration, longDate, parseDateKey, shortDate } from '../lib/time'
 import { useNav } from '../nav'
 import { RoutineEditor } from './RoutineEditor'
+import { KeySheet } from './KeySheet'
 
 export function Today() {
   const nav = useNav()
@@ -17,6 +18,7 @@ export function Today() {
   const entries = useEntries()
   const routine = useRoutine()
   const [editing, setEditing] = useState(false)
+  const [pickKey, setPickKey] = useState(false)
 
   const today = dateKey()
   const todayEntries = useMemo(() => entries.filter(e => e.date === today), [entries, today])
@@ -76,12 +78,12 @@ export function Today() {
             <div className="caption" style={{ marginTop: 'auto' }}>{st.since ? `${st.since.getMonth() + 1}월 ${st.since.getDate()}일부터` : '오늘 시작해요'}</div>
           </div>
           <div style={{ width: 1, background: 'var(--line)' }} />
-          <div style={{ width: 150, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div className="label">오늘의 조</div>
+          <button onClick={() => setPickKey(true)} style={{ width: 150, display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
+            <div className="label">오늘의 조 ›</div>
             <div className="serif" style={{ fontSize: 44, fontWeight: 600, lineHeight: 1 }}>{key}</div>
             <div style={{ fontSize: 13, fontWeight: 600, marginTop: 'auto' }}>{key} major · {relativeMinor(key)} minor</div>
-            <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{nextKeyLabel(settings.todayKeyMode)}</div>
-          </div>
+            <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{nextKeyLabel(settings)}</div>
+          </button>
         </div>
 
         {pinned.length > 0 && (
@@ -193,6 +195,7 @@ export function Today() {
         </button>
       </div>
       {editing && <RoutineEditor onClose={() => setEditing(false)} />}
+      {pickKey && <KeySheet onClose={() => setPickKey(false)} />}
     </div>
   )
 }

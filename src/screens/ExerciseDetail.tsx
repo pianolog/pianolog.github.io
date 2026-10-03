@@ -47,7 +47,7 @@ export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
   const mine = useMemo(() => all.filter(e => e.refType === book && e.refNo === no), [all, book, no])
   const stat = useMemo(() => exerciseStats(mine, book).get(no), [mine, book, no])
   const weekly = useMemo(() => weeklyBest(mine), [mine])
-  const tKey = todayKey(settings.todayKeyMode, all)
+  const tKey = todayKey(settings, all)
   const map = book === 'hanon' ? settings.hanonBook : settings.pischnaBook
   const page = map.pages[no]
   const sub = [book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음'].filter(Boolean).join(' · ')

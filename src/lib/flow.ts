@@ -26,7 +26,7 @@ export function targetLabel(t: PracticeTarget) {
 /** 화면에서 쓰는 루틴 계산 조건 (오늘의 조, 피쉬나 a·b, 오늘 할 구간) */
 export function useRoutineCtx(settings: Settings, entries: Entry[]): RoutineCtx {
   const rep = useRepData()
-  const key = todayKey(settings.todayKeyMode, entries)
+  const key = todayKey(settings, entries)
   return useMemo(
     () => ({
       splits: settings.pischnaSplits,
@@ -41,7 +41,7 @@ export function useRoutineCtx(settings: Settings, entries: Entry[]): RoutineCtx 
 export async function nextRoutineTarget(routineId: number): Promise<PracticeTarget | null> {
   const [routine, all, s, rep] = await Promise.all([db.routine.orderBy('order').toArray(), db.entries.toArray(), loadSettings(), loadRepData()])
   const today = all.filter(e => e.date === dateKey())
-  const key = todayKey(s.todayKeyMode, all)
+  const key = todayKey(s, all)
   const ctx: RoutineCtx = {
     splits: s.pischnaSplits,
     key,
