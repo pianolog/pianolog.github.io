@@ -238,7 +238,7 @@ function SplitSheet({ value, onClose }: { value: number[]; onClose: () => void }
   const toggle = (n: number) => setSel(x => (x.includes(n) ? x.filter(v => v !== n) : [...x, n]))
   return (
     <Sheet onClose={onClose}>
-      <SheetHead title="피쉬나 a·b 번호" sub="악보에서 a·b로 나뉜 번호를 고르세요. 그 번호는 따로 기록돼요." onClose={onClose} />
+      <SheetHead title="피쉬나 a·b 번호" sub="기본값은 Schirmer 판 기준(1·2·5·6·15·16·20번)이에요. 쓰는 악보가 다르면 고치세요." onClose={onClose} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(0, 1fr))', gap: 6, marginTop: 18 }}>
         {Array.from({ length: PISCHNA_SIZE }, (_, i) => i + 1).map(n => (
           <button key={n} className={`pick tap${sel.includes(n) ? ' on' : ''}`} style={{ padding: 0, height: 56, flexDirection: 'column', gap: 0 }} onClick={() => toggle(n)}>

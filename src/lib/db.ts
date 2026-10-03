@@ -209,7 +209,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ladderStep: 4,
   hanonBook: { scoreId: null, pages: {} },
   pischnaBook: { scoreId: null, pages: {} },
-  pischnaSplits: [],
+  // Schirmer 판(Library of Musical Classics Vol. 792, Wolff·Riemann 편집)에서 a·b로 나뉜 번호
+  pischnaSplits: [1, 2, 5, 6, 15, 16, 20],
   dailyReviewMax: 6
 }
 
