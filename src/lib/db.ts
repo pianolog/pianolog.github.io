@@ -16,7 +16,7 @@ export interface Entry {
   date: string
   createdAt: number
   refType: RefType
-  refNo: number // 하농·피쉬나 번호, 자유 연습은 0
+  refNo: number // 하농 번호, 피쉬나 번호×10+a/b, 스케일 종류×100+조, 자유 연습은 0
   title: string // 자유 연습 제목 또는 표시용 이름
   key?: Key
   seconds: number
@@ -32,7 +32,7 @@ export interface RoutineItem {
   id?: number
   order: number
   refType: RefType
-  from: number // 하농·피쉬나 시작 번호
+  from: number // 하농·피쉬나 시작 번호 (스케일은 오늘의 조라서 안 씀)
   to: number // 끝 번호 (단일이면 from과 같음)
   title: string // 자유 항목 제목
   minutes: number
@@ -85,6 +85,7 @@ export interface Settings {
   ladderStep: number
   hanonBook: BookMap
   pischnaBook: BookMap
+  pischnaSplits: number[] // a·b로 나뉜 피쉬나 번호
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -93,7 +94,8 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   ladderStep: 4,
   hanonBook: { scoreId: null, pages: {} },
-  pischnaBook: { scoreId: null, pages: {} }
+  pischnaBook: { scoreId: null, pages: {} },
+  pischnaSplits: []
 }
 
 export async function loadSettings(): Promise<Settings> {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BOOK_NAME, BOOK_SIZE, type Book } from '../data/exercises'
+import { BOOK_NAME, PISCHNA_SIZE, bookItems, type ScoreBook } from '../data/exercises'
 import { Icon } from '../components/Icon'
 import { Segmented, Sheet, SheetHead, useToast } from '../components/ui'
 import { db, saveSetting, type BookMap } from '../lib/db'
@@ -27,7 +27,8 @@ export function SettingsPage() {
   const toast = useToast()
   const s = useSettings()
   const scores = useLiveQuery(() => db.scores.orderBy('createdAt').reverse().toArray(), [], [])
-  const [mapping, setMapping] = useState<Book | null>(null)
+  const [mapping, setMapping] = useState<ScoreBook | null>(null)
+  const [splitting, setSplitting] = useState(false)
   const [usage, setUsage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -72,16 +73,23 @@ export function SettingsPage() {
           <div className="card-head">
             <span className="t">하농·피쉬나 악보<span className="sub">책 PDF 연결 + 번호별 페이지</span></span>
           </div>
-          {(['hanon', 'pischna'] as Book[]).map(b => {
+          {(['hanon', 'pischna'] as ScoreBook[]).map(b => {
             const map = b === 'hanon' ? s.hanonBook : s.pischnaBook
             const sc = scores.find(x => x.id === map.scoreId)
-            const mapped = Object.keys(map.pages).length
+            const items = bookItems(b, s.pischnaSplits)
+            const mapped = items.filter(it => map.pages[it.no]).length
             return (
-              <Row key={b} label={BOOK_NAME[b]} sub={sc ? `${sc.name} · ${mapped}/60 번호 페이지 지정` : '연결된 PDF 없음'}>
+              <Row key={b} label={BOOK_NAME[b]} sub={sc ? `${sc.name} · ${mapped}/${items.length} 번호 페이지 지정` : '연결된 PDF 없음'}>
                 <button className="btn sm" onClick={() => setMapping(b)}>{sc ? '편집' : '연결'}</button>
               </Row>
             )
           })}
+        </div>
+
+        <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <Row label="피쉬나 a·b 번호" sub={s.pischnaSplits.length ? `${[...s.pischnaSplits].sort((a, b) => a - b).join(', ')}번을 a·b로 나눔` : '나눈 번호 없음 (1–60)'}>
+            <button className="btn sm" onClick={() => setSplitting(true)}>편집</button>
+          </Row>
         </div>
 
         <div className="card">
@@ -136,23 +144,25 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {mapping && <BookMapSheet book={mapping} value={mapping === 'hanon' ? s.hanonBook : s.pischnaBook} onClose={() => setMapping(null)} />}
+      {mapping && <BookMapSheet book={mapping} splits={s.pischnaSplits} value={mapping === 'hanon' ? s.hanonBook : s.pischnaBook} onClose={() => setMapping(null)} />}
+      {splitting && <SplitSheet value={s.pischnaSplits} onClose={() => setSplitting(false)} />}
     </div>
   )
 }
 
-function BookMapSheet({ book, value, onClose }: { book: Book; value: BookMap; onClose: () => void }) {
+function BookMapSheet({ book, splits, value, onClose }: { book: ScoreBook; splits: number[]; value: BookMap; onClose: () => void }) {
+  const items = bookItems(book, splits)
   const scores = useLiveQuery(() => db.scores.orderBy('createdAt').reverse().toArray(), [], [])
   const [scoreId, setScoreId] = useState(value.scoreId)
   const [pages, setPages] = useState<Record<number, number>>(value.pages)
-  const [first, setFirst] = useState(value.pages[1] ?? 1)
+  const [first, setFirst] = useState(value.pages[items[0].no] ?? 1)
   const [per, setPer] = useState(1)
   const toast = useToast()
   const max = scores.find(x => x.id === scoreId)?.pageCount ?? 999
 
   const autofill = () => {
     const out: Record<number, number> = {}
-    for (let n = 1; n <= BOOK_SIZE; n++) out[n] = Math.min(max, first + (n - 1) * per)
+    items.forEach((it, i) => (out[it.no] = Math.min(max, first + i * per)))
     setPages(out)
   }
 
@@ -181,7 +191,7 @@ function BookMapSheet({ book, value, onClose }: { book: Book; value: BookMap; on
 
       <div style={{ marginTop: 22, background: 'var(--bg)', borderRadius: 16, padding: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span className="sec-label">빠르게 채우기</span>
-        <span className="caption">1번이</span>
+        <span className="caption">{items[0].label}번이</span>
         <input className="field" inputMode="numeric" value={first || ''} onChange={e => setFirst(num(e.target.value))} style={{ width: 70, height: 48, textAlign: 'center', background: 'var(--s1)' }} />
         <span className="caption">쪽, 번호당</span>
         <input className="field" inputMode="numeric" value={per || ''} onChange={e => setPer(num(e.target.value))} style={{ width: 60, height: 48, textAlign: 'center', background: 'var(--s1)' }} />
@@ -190,9 +200,9 @@ function BookMapSheet({ book, value, onClose }: { book: Book; value: BookMap; on
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(0, 1fr))', gap: 6, marginTop: 16 }}>
-        {Array.from({ length: BOOK_SIZE }, (_, i) => i + 1).map(n => (
+        {items.map(({ no: n, label }) => (
           <label key={n} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--ink3)', fontWeight: 600 }}>{n}번</span>
+            <span style={{ fontSize: 12, color: 'var(--ink3)', fontWeight: 600 }}>{label}번</span>
             <input
               className="field"
               inputMode="numeric"
@@ -213,6 +223,39 @@ function BookMapSheet({ book, value, onClose }: { book: Book; value: BookMap; on
       </div>
 
       <button className="btn primary" style={{ marginTop: 22, height: 64 }} onClick={save} disabled={!scoreId}>
+        저장
+      </button>
+    </Sheet>
+  )
+}
+
+function SplitSheet({ value, onClose }: { value: number[]; onClose: () => void }) {
+  const [sel, setSel] = useState<number[]>(value)
+  const toast = useToast()
+  const toggle = (n: number) => setSel(x => (x.includes(n) ? x.filter(v => v !== n) : [...x, n]))
+  return (
+    <Sheet onClose={onClose}>
+      <SheetHead title="피쉬나 a·b 번호" sub="악보에서 a·b로 나뉜 번호를 고르세요. 그 번호는 따로 기록돼요." onClose={onClose} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(0, 1fr))', gap: 6, marginTop: 18 }}>
+        {Array.from({ length: PISCHNA_SIZE }, (_, i) => i + 1).map(n => (
+          <button key={n} className={`pick tap${sel.includes(n) ? ' on' : ''}`} style={{ padding: 0, height: 56, flexDirection: 'column', gap: 0 }} onClick={() => toggle(n)}>
+            <span style={{ fontSize: 17, fontWeight: 600 }}>{n}</span>
+            {sel.includes(n) && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accentText)' }}>a · b</span>}
+          </button>
+        ))}
+      </div>
+      <div className="caption" style={{ marginTop: 14, lineHeight: 1.6 }}>
+        이미 기록이 있는 번호를 나누면, 나누기 전 기록은 상세 화면에서 따로 보이지 않을 수 있어요. 처음에 한 번 정해 두는 걸 권해요.
+      </div>
+      <button
+        className="btn primary"
+        style={{ marginTop: 22, height: 64 }}
+        onClick={async () => {
+          await saveSetting('pischnaSplits', [...sel].sort((a, b) => a - b))
+          toast('저장됨')
+          onClose()
+        }}
+      >
         저장
       </button>
     </Sheet>

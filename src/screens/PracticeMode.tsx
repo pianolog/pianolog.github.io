@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { exerciseTitle, type Hand, type Key } from '../data/exercises'
+import { exerciseTitle, variationsFor, type Hand, type Key } from '../data/exercises'
 import { Icon, PauseIcon, PlayIcon } from '../components/Icon'
 import { Sheet, SheetHead, useToast } from '../components/ui'
 import { db, loadSettings, type Entry } from '../lib/db'
@@ -121,7 +121,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
       const s = await loadSettings()
       const k = todayKey(s.todayKeyMode, await db.entries.toArray())
       const i = routine.findIndex(r => r.id === target.routineId)
-      const next = routine.slice(i + 1).map(r => routineProgress(r, today)).find(p => p.status !== 'done')
+      const next = routine.slice(i + 1).map(r => routineProgress(r, today, { splits: s.pischnaSplits, key: k })).find(p => p.status !== 'done' && targetFor(p, k))
       if (alive) setNextRoutine(next ? targetFor(next, k) : null)
     })()
     return () => {
@@ -130,7 +130,13 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
   }, [target, finishing])
 
   const queueNext = target.refType !== 'free' && idx + 1 < target.queue.length ? target.queue[idx + 1] : null
-  const nextLabel = queueNext ? `${exerciseTitle(target.refType as 'hanon', queueNext)}${key ? ` · ${key} major` : ''}` : nextRoutine ? nextRoutineLabel(nextRoutine) : null
+  const nextLabel =
+    queueNext !== null && target.refType !== 'free'
+      ? `${exerciseTitle(target.refType, queueNext)}${target.refType === 'hanon' && key ? ` · ${key} major` : ''}`
+      : nextRoutine
+        ? nextRoutineLabel(nextRoutine)
+        : null
+  const varList = variationsFor(target.refType, no)
 
   const save = async (d: FinishData, goNext: boolean) => {
     if (!sessionId) return
@@ -191,9 +197,11 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
     onClose()
   }
 
+  // 자유 연습은 제목별, 스케일은 한 권으로 악보를 기억한다
+  const pickKey = target.refType === 'free' ? `score:free:${target.title}` : target.refType === 'scale' ? 'score:scale' : null
   const openScore = async () => {
-    if (target.refType === 'free') {
-      const r = await db.settings.get(`score:free:${target.title}`)
+    if (pickKey) {
+      const r = await db.settings.get(pickKey)
       const v = r?.value as { id: number; page: number } | undefined
       if (v && (await db.scores.get(v.id))) return setScore(v)
       return setPicking(true)
@@ -327,7 +335,8 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
           refType={target.refType}
           seconds={itemSec}
           todayKey={target.refType === 'hanon' ? todayKey(settings.todayKeyMode, entries) : undefined}
-          initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key, hands: lastHands.current, variations: lastVars.current, rating: 0, memo: '' }}
+          variations={varList}
+          initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key: target.refType === 'scale' ? undefined : key, hands: lastHands.current, variations: lastVars.current.filter(v => varList.includes(v)), rating: 0, memo: '' }}
           nextLabel={nextLabel}
           onSave={save}
           onClose={cancelFinish}
@@ -336,12 +345,12 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
 
       {editLadder && <LadderSheet value={ladder} onClose={() => setEditLadder(false)} onSave={l => { setLadder(l); void db.settings.put({ key: ladderKey(target, no), value: l }); setEditLadder(false) }} />}
 
-      {picking && target.refType === 'free' && (
+      {picking && pickKey && (
         <ScorePicker
-          title={`${target.title} 악보`}
+          title={`${target.refType === 'free' ? target.title : '스케일·아르페지오'} 악보`}
           onClose={() => setPicking(false)}
           onPick={(id, page) => {
-            void db.settings.put({ key: `score:free:${target.title}`, value: { id, page } })
+            void db.settings.put({ key: pickKey, value: { id, page } })
             setPicking(false)
             setScore({ id, page })
           }}

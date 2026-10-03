@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Book, Key } from './data/exercises'
+import type { Book, Key, ScoreBook } from './data/exercises'
 
 export type Tab = 'today' | 'practice' | 'basics' | 'repertoire' | 'records'
 
@@ -9,7 +9,7 @@ export type PracticeTarget =
   | { refType: 'free'; title: string; routineId?: number }
 
 export type Page =
-  | { kind: 'detail'; book: Book; no: number }
+  | { kind: 'detail'; book: ScoreBook; no: number }
   | { kind: 'settings' }
 
 export interface Nav {

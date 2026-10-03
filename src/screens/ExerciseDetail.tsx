@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { BOOK_NAME, HANON_PARTS, KEYS, VARIATIONS, exerciseTitle, type Book } from '../data/exercises'
+import { BOOK_NAME, KEYS, VARIATIONS, exerciseTitle, type ScoreBook } from '../data/exercises'
 import { Icon, PlayIcon } from '../components/Icon'
 import { useToast } from '../components/ui'
 import { useEntries, useSettings } from '../lib/hooks'
@@ -39,7 +39,7 @@ function Chart({ data }: { data: { label: string; clean: number; reach: number }
   )
 }
 
-export function ExerciseDetail({ book, no }: { book: Book; no: number }) {
+export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
   const nav = useNav()
   const toast = useToast()
   const all = useEntries()
@@ -50,8 +50,7 @@ export function ExerciseDetail({ book, no }: { book: Book; no: number }) {
   const tKey = todayKey(settings.todayKeyMode, all)
   const map = book === 'hanon' ? settings.hanonBook : settings.pischnaBook
   const page = map.pages[no]
-  const part = book === 'hanon' ? HANON_PARTS.find(p => no >= p.from && no <= p.to)?.label : null
-  const sub = [part, book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음'].filter(Boolean).join(' · ')
+  const sub = [book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음'].filter(Boolean).join(' · ')
 
   const openScore = () => {
     if (!map.scoreId) return toast(`설정에서 ${BOOK_NAME[book]} 악보 PDF를 연결하세요`)
@@ -64,7 +63,7 @@ export function ExerciseDetail({ book, no }: { book: Book; no: number }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <button className="back" onClick={nav.closePage}>
             <Icon name="left" size={20} width={1.8} />
-            {BOOK_NAME[book]} 60
+            {BOOK_NAME[book]}
           </button>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

@@ -1,4 +1,4 @@
-import { KEYS, type Book, type Key } from '../data/exercises'
+import { KEYS, bookItems, pischnaLabel, relativeMinor, scaleQueue, type Book, type Key } from '../data/exercises'
 import type { Entry, RoutineItem, TodayKeyMode } from './db'
 import { addDays, dateKey, dayIndex } from './time'
 
@@ -99,22 +99,32 @@ export function nextKeyLabel(mode: TodayKeyMode) {
 
 // ── 루틴 ──
 
-export function routineNumbers(item: RoutineItem) {
+/** 루틴 계산에 필요한 그날의 조건 */
+export interface RoutineCtx {
+  splits: number[] // 피쉬나 a·b 번호
+  key: Key // 오늘의 조
+}
+
+export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
   if (item.refType === 'free') return []
-  const out: number[] = []
-  for (let n = item.from; n <= item.to; n++) out.push(n)
-  return out
+  if (item.refType === 'scale') return scaleQueue(ctx.key)
+  return bookItems(item.refType, ctx.splits)
+    .filter(it => it.no >= item.from && it.no <= item.to)
+    .map(it => it.no)
 }
 
 export function routineLabel(item: RoutineItem, key?: Key) {
   if (item.refType === 'free') return item.title
+  if (item.refType === 'scale') return key ? `스케일·아르페지오 · ${key} / ${relativeMinor(key)}` : '스케일·아르페지오 (오늘의 조)'
+  const lab = item.refType === 'pischna' ? pischnaLabel : String
+  const range = item.from === item.to ? lab(item.from) : `${lab(item.from)}–${lab(item.to)}`
   const name = item.refType === 'hanon' ? '하농' : '피쉬나'
-  const range = item.from === item.to ? `${item.from}` : `${item.from}–${item.to}`
   return item.refType === 'hanon' && key ? `${name} ${range} · ${key}` : `${name} ${range}`
 }
 
 export interface RoutineProgress {
   item: RoutineItem
+  nums: number[]
   done: number // 오늘 친 번호 수
   total: number
   seconds: number
@@ -122,21 +132,21 @@ export interface RoutineProgress {
   nextNo: number | null // 다음에 칠 번호
 }
 
-export function routineProgress(item: RoutineItem, todayEntries: Entry[]): RoutineProgress {
+export function routineProgress(item: RoutineItem, todayEntries: Entry[], ctx: RoutineCtx): RoutineProgress {
   if (item.refType === 'free') {
     const mine = todayEntries.filter(e => e.refType === 'free' && e.title === item.title)
     const seconds = mine.reduce((a, e) => a + e.seconds, 0)
     const status = seconds >= item.minutes * 60 ? 'done' : seconds > 0 ? 'prog' : 'pend'
-    return { item, done: mine.length ? 1 : 0, total: 1, seconds, status, nextNo: null }
+    return { item, nums: [], done: mine.length ? 1 : 0, total: 1, seconds, status, nextNo: null }
   }
-  const nums = routineNumbers(item)
+  const nums = routineNumbers(item, ctx)
   const mine = todayEntries.filter(e => e.refType === item.refType && nums.includes(e.refNo))
   const doneSet = new Set(mine.map(e => e.refNo))
   const seconds = mine.reduce((a, e) => a + e.seconds, 0)
   const done = doneSet.size
   const nextNo = nums.find(n => !doneSet.has(n)) ?? null
-  const status = done >= nums.length ? 'done' : done > 0 ? 'prog' : 'pend'
-  return { item, done, total: nums.length, seconds, status, nextNo }
+  const status = nums.length && done >= nums.length ? 'done' : done > 0 ? 'prog' : 'pend'
+  return { item, nums, done, total: nums.length, seconds, status, nextNo }
 }
 
 /** 최근 n주 주별 최고 BPM (클린 / 도달) */

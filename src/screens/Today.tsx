@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react'
-import { RELATIVE_MINOR, exerciseTitle } from '../data/exercises'
+import { exerciseTitle, relativeMinor } from '../data/exercises'
 import { Icon, PlayIcon } from '../components/Icon'
 import { StatusIcon } from '../components/ui'
 import { useEntries, useRoutine, useSettings } from '../lib/hooks'
-import { nextKeyLabel, routineLabel, routineNumbers, routineProgress, secondsOn, streak, todayKey, type RoutineProgress } from '../lib/stats'
+import { nextKeyLabel, routineLabel, routineProgress, secondsOn, streak, todayKey, type RoutineProgress } from '../lib/stats'
 import { dateKey, duration, longDate, clock } from '../lib/time'
 import { useNav, type PracticeTarget } from '../nav'
 import { RoutineEditor } from './RoutineEditor'
 import type { Key } from '../data/exercises'
 
-export function targetFor(p: RoutineProgress, key: Key): PracticeTarget {
-  const { item } = p
+/** 루틴 항목 → 연습 대상. 번호가 하나도 없으면(범위 밖) null */
+export function targetFor(p: RoutineProgress, key: Key): PracticeTarget | null {
+  const { item, nums } = p
   if (item.refType === 'free') return { refType: 'free', title: item.title, routineId: item.id }
-  const nums = routineNumbers(item)
+  if (!nums.length) return null
   const from = p.nextNo ?? nums[0]
   return { refType: item.refType, queue: nums.slice(nums.indexOf(from)), key: item.refType === 'hanon' ? key : undefined, routineId: item.id }
 }
@@ -30,12 +31,13 @@ export function Today() {
   const goal = settings.dailyGoalMin * 60
   const st = streak(entries)
   const key = todayKey(settings.todayKeyMode, entries)
-  const progress = routine.map(r => routineProgress(r, todayEntries))
+  const progress = routine.map(r => routineProgress(r, todayEntries, { splits: settings.pischnaSplits, key }))
   const plannedMin = routine.reduce((a, r) => a + r.minutes, 0)
-  const next = progress.find(p => p.status !== 'done')
+  const next = progress.find(p => p.status !== 'done' && targetFor(p, key))
 
   const start = () => {
-    if (next) nav.startPractice(targetFor(next, key))
+    const t = next && targetFor(next, key)
+    if (t) nav.startPractice(t)
     else nav.setTab('practice')
   }
 
@@ -77,7 +79,7 @@ export function Today() {
           <div style={{ width: 150, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div className="label">오늘의 조</div>
             <div className="serif" style={{ fontSize: 44, fontWeight: 600, lineHeight: 1 }}>{key}</div>
-            <div style={{ fontSize: 13, fontWeight: 600, marginTop: 'auto' }}>{key} major · {RELATIVE_MINOR[key]} minor</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginTop: 'auto' }}>{key} major · {relativeMinor(key)} minor</div>
             <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{nextKeyLabel(settings.todayKeyMode)}</div>
           </div>
         </div>
@@ -98,7 +100,7 @@ export function Today() {
             const sub =
               p.status === 'done' ? `완료 · ${duration(p.seconds)}` : p.status === 'prog' ? `진행 중 · ${p.item.refType === 'free' ? duration(p.seconds) : `${p.done} / ${p.total}`}` : '대기'
             return (
-              <button key={p.item.id} onClick={() => nav.startPractice(targetFor(p, key))} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, minHeight: 66, padding: '0 14px', borderRadius: 12, background: p === next && p.status === 'prog' ? 'var(--s2)' : 'transparent', textAlign: 'left' }}>
+              <button key={p.item.id} onClick={() => { const t = targetFor(p, key); if (t) nav.startPractice(t) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, minHeight: 66, padding: '0 14px', borderRadius: 12, background: p === next && p.status === 'prog' ? 'var(--s2)' : 'transparent', textAlign: 'left' }}>
                 <StatusIcon status={p.status} />
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span className={p.item.refType === 'free' ? 'serif' : ''} style={{ fontSize: 17, fontWeight: 600, color: p.status === 'done' ? 'var(--ink2)' : 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

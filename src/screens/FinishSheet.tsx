@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HANDS, KEYS, VARIATIONS, type Hand, type Key } from '../data/exercises'
+import { HANDS, KEYS, type Hand, type Key } from '../data/exercises'
 import { Icon } from '../components/Icon'
 import { BpmStepper, Segmented, Sheet, SheetHead, Stars } from '../components/ui'
 import type { RefType } from '../lib/db'
@@ -22,6 +22,7 @@ export function FinishSheet({
   initial,
   todayKey,
   nextLabel,
+  variations,
   onSave,
   onClose
 }: {
@@ -31,6 +32,7 @@ export function FinishSheet({
   initial: FinishData
   todayKey?: Key
   nextLabel: string | null
+  variations: readonly string[]
   onSave: (d: FinishData, next: boolean) => void
   onClose: () => void
 }) {
@@ -60,7 +62,7 @@ export function FinishSheet({
           <BpmStepper label="클린 BPM" hint={`자동 ${initial.cleanBpm}`} value={d.cleanBpm} onChange={cleanBpm => set({ cleanBpm })} accent />
         </div>
 
-        {refType !== 'free' && (
+        {(refType === 'hanon' || refType === 'pischna') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
               <span className="sec-label">조</span>
@@ -93,7 +95,7 @@ export function FinishSheet({
             <span style={{ fontSize: 12, color: 'var(--ink3)' }}>여러 개 선택</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {VARIATIONS.map(v => (
+            {variations.map(v => (
               <button key={v} className={`pick tap${d.variations.includes(v) ? ' on' : ''}`} style={{ height: 52, padding: '0 20px' }} onClick={() => toggleVar(v)}>
                 {v}
               </button>

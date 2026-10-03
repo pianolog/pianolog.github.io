@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { BOOK_SIZE, type Book } from '../data/exercises'
+import { KEYS, MINORS, bookItems, scaleNo, type ScoreBook } from '../data/exercises'
 import { Icon, PlayIcon } from '../components/Icon'
 import { Segmented, StatusIcon } from '../components/ui'
 import { useEntries, useRoutine, useSettings } from '../lib/hooks'
@@ -14,12 +14,14 @@ export function PracticeTab() {
   const entries = useEntries()
   const routine = useRoutine()
   const settings = useSettings()
-  const [book, setBook] = useState<Book>('hanon')
+  const [book, setBook] = useState<ScoreBook | 'scale' | 'arpeggio'>('hanon')
   const [free, setFree] = useState('')
   const key = todayKey(settings.todayKeyMode, entries)
   const today = dateKey()
   const todayEntries = useMemo(() => entries.filter(e => e.date === today), [entries, today])
-  const done = new Set(todayEntries.filter(e => e.refType === book).map(e => e.refNo))
+  const refType = book === 'arpeggio' ? 'scale' : book
+  const done = new Set(todayEntries.filter(e => e.refType === refType).map(e => e.refNo))
+  const doneStyle = (n: number) => ({ background: done.has(n) ? 'color-mix(in oklch, var(--ok) 22%, var(--s1))' : 'var(--s2)' })
 
   // 최근에 쓴 자유 연습 제목
   const recentFree = useMemo(() => {
@@ -44,9 +46,9 @@ export function PracticeTab() {
               <span className="t">오늘의 루틴</span>
             </div>
             {routine.map(r => {
-              const p = routineProgress(r, todayEntries)
+              const p = routineProgress(r, todayEntries, { splits: settings.pischnaSplits, key })
               return (
-                <button key={r.id} onClick={() => nav.startPractice(targetFor(p, key))} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, minHeight: 60, padding: '0 14px', textAlign: 'left' }}>
+                <button key={r.id} onClick={() => { const t = targetFor(p, key); if (t) nav.startPractice(t) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, minHeight: 60, padding: '0 14px', textAlign: 'left' }}>
                   <StatusIcon status={p.status} />
                   <span style={{ flex: 1, fontSize: 17, fontWeight: 600 }}>{routineLabel(r, key)}</span>
                   <span style={{ color: 'var(--ink2)' }}>{r.minutes}분</span>
@@ -60,20 +62,38 @@ export function PracticeTab() {
         <div className="card">
           <div className="card-head" style={{ marginBottom: 14 }}>
             <span className="t">번호 골라서 연습</span>
-            <Segmented value={book} onChange={setBook} options={[{ value: 'hanon', label: '하농' }, { value: 'pischna', label: '피쉬나' }]} />
+            <Segmented value={book} onChange={setBook} options={[{ value: 'hanon', label: '하농' }, { value: 'pischna', label: '피쉬나' }, { value: 'scale', label: '스케일' }, { value: 'arpeggio', label: '아르페지오' }]} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(0, 1fr))', gap: 6 }}>
-            {Array.from({ length: BOOK_SIZE }, (_, i) => i + 1).map(n => (
-              <button
-                key={n}
-                className="tap"
-                onClick={() => nav.startPractice({ refType: book, queue: [n], key: book === 'hanon' ? key : undefined })}
-                style={{ height: 52, borderRadius: 10, background: done.has(n) ? 'color-mix(in oklch, var(--ok) 22%, var(--s1))' : 'var(--s2)', fontSize: 17, fontWeight: 600 }}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          {book === 'hanon' || book === 'pischna' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${book === 'hanon' ? 5 : 10}, minmax(0, 1fr))`, gap: 6 }}>
+              {bookItems(book, settings.pischnaSplits).map(it => (
+                <button
+                  key={it.no}
+                  className="tap"
+                  onClick={() => nav.startPractice({ refType: book, queue: [it.no], key: book === 'hanon' ? key : undefined })}
+                  style={{ height: book === 'hanon' ? 64 : 52, borderRadius: 10, fontSize: 17, fontWeight: 600, ...doneStyle(it.no) }}
+                >
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[0, 12].map(off => (
+                <div key={off} style={{ display: 'grid', gridTemplateColumns: '64px repeat(12, minmax(0, 1fr))', gap: 6, alignItems: 'center' }}>
+                  <span className="caption">{off ? '단조' : '장조'}</span>
+                  {KEYS.map((k, i) => {
+                    const no = scaleNo(book === 'arpeggio' ? 1 : 0, i + off)
+                    return (
+                      <button key={no} className="tap serif" onClick={() => nav.startPractice({ refType: 'scale', queue: [no] })} style={{ height: 52, borderRadius: 10, fontSize: 17, fontWeight: 600, ...doneStyle(no) }}>
+                        {off ? MINORS[i] : k}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
           {book === 'hanon' && <div className="caption" style={{ marginTop: 12 }}>오늘의 조 <span className="serif" style={{ fontWeight: 600, color: 'var(--accentText)' }}>{key}</span>로 시작해요. 조는 항목을 끝낼 때 바꿀 수 있어요.</div>}
         </div>
 

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { BOOK_SIZE } from '../data/exercises'
+import { HANON_FROM, bookItems, type ScoreBook } from '../data/exercises'
 import { Icon } from '../components/Icon'
 import { Segmented, Sheet, SheetHead } from '../components/ui'
 import { db, type RefType } from '../lib/db'
-import { useRoutine } from '../lib/hooks'
+import { useRoutine, useSettings } from '../lib/hooks'
 import { routineLabel } from '../lib/stats'
 
-function NumBox({ value, onChange, min = 1, max = BOOK_SIZE, w = 72 }: { value: number; onChange: (n: number) => void; min?: number; max?: number; w?: number }) {
+function NumBox({ value, onChange, min = 1, max = 240, w = 72 }: { value: number; onChange: (n: number) => void; min?: number; max?: number; w?: number }) {
   return (
     <input
       className="field"
@@ -22,20 +22,34 @@ function NumBox({ value, onChange, min = 1, max = BOOK_SIZE, w = 72 }: { value: 
   )
 }
 
+const selectStyle = { width: 96, height: 52, background: 'var(--s1)', fontSize: 18, fontWeight: 600, textAlign: 'center' } as const
+
 export function RoutineEditor({ onClose }: { onClose: () => void }) {
   const routine = useRoutine()
+  const settings = useSettings()
   const [type, setType] = useState<RefType>('hanon')
-  const [from, setFrom] = useState(1)
-  const [to, setTo] = useState(5)
+  const [from, setFrom] = useState(HANON_FROM)
+  const [to, setTo] = useState(HANON_FROM + 4)
+  const items = type === 'hanon' || type === 'pischna' ? bookItems(type, settings.pischnaSplits) : []
+
+  const changeType = (t: RefType) => {
+    setType(t)
+    if (t === 'hanon' || t === 'pischna') {
+      const list = bookItems(t as ScoreBook, settings.pischnaSplits)
+      setFrom(list[0].no)
+      setTo(list[Math.min(4, list.length - 1)].no)
+    }
+  }
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState(15)
 
-  const valid = type === 'free' ? title.trim().length > 0 : from >= 1 && to >= from && to <= BOOK_SIZE
+  const valid = type === 'free' ? title.trim().length > 0 : type === 'scale' ? true : to >= from
 
   const add = async () => {
     if (!valid) return
     const order = routine.length ? Math.max(...routine.map(r => r.order)) + 1 : 0
-    await db.routine.add({ order, refType: type, from: type === 'free' ? 0 : from, to: type === 'free' ? 0 : to, title: title.trim(), minutes: minutes || 5 })
+    const ranged = type === 'hanon' || type === 'pischna'
+    await db.routine.add({ order, refType: type, from: ranged ? from : 0, to: ranged ? to : 0, title: type === 'free' ? title.trim() : '', minutes: minutes || 5 })
     setTitle('')
   }
 
@@ -72,25 +86,32 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
         <Segmented
           large
           value={type}
-          onChange={setType}
+          onChange={changeType}
           options={[
             { value: 'hanon', label: '하농' },
             { value: 'pischna', label: '피쉬나' },
-            { value: 'free', label: '자유 (곡·스케일 등)' }
+            { value: 'scale', label: '스케일·아르페지오' },
+            { value: 'free', label: '자유 (곡 등)' }
           ]}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {type === 'free' ? (
-            <input className="field" placeholder="예) 쇼팽 에튀드 Op.10 No.4, 스케일 E♭" value={title} onChange={e => setTitle(e.target.value)} style={{ flex: 1, minWidth: 240, background: 'var(--s1)' }} />
+            <input className="field" placeholder="예) 쇼팽 에튀드 Op.10 No.4" value={title} onChange={e => setTitle(e.target.value)} style={{ flex: 1, minWidth: 240, background: 'var(--s1)' }} />
+          ) : type === 'scale' ? (
+            <span style={{ flex: 1, fontSize: 15, color: 'var(--ink2)' }}>그날의 조로 장조·단조 스케일과 아르페지오 4개</span>
           ) : (
             <>
-              <NumBox value={from} onChange={n => { setFrom(n); if (n > to) setTo(n) }} />
+              <select className="field" value={from} onChange={e => { const n = Number(e.target.value); setFrom(n); if (n > to) setTo(n) }} style={selectStyle}>
+                {items.map(it => <option key={it.no} value={it.no}>{it.label}</option>)}
+              </select>
               <span style={{ color: 'var(--ink3)' }}>번부터</span>
-              <NumBox value={to} onChange={setTo} min={from} />
+              <select className="field" value={to} onChange={e => setTo(Number(e.target.value))} style={selectStyle}>
+                {items.filter(it => it.no >= from).map(it => <option key={it.no} value={it.no}>{it.label}</option>)}
+              </select>
               <span style={{ color: 'var(--ink3)' }}>번까지</span>
             </>
           )}
-          <span style={{ marginLeft: type === 'free' ? 0 : 'auto' }} />
+          <span style={{ marginLeft: type === 'hanon' || type === 'pischna' ? 'auto' : 0 }} />
           <NumBox value={minutes} onChange={setMinutes} max={240} />
           <span style={{ color: 'var(--ink3)' }}>분</span>
         </div>
