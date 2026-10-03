@@ -1,4 +1,4 @@
-import { KEYS, bookItems, pischnaLabel, relativeMinor, scaleQueue, type Book, type Key } from '../data/exercises'
+import { KEYS, bookItems, circleQueue, pischnaLabel, relativeMinor, scaleQueue, type Book, type Key, type ScaleSet } from '../data/exercises'
 import type { Entry, RoutineItem, Settings } from './db'
 import { addDays, dateKey, dayIndex } from './time'
 
@@ -114,11 +114,12 @@ export interface RoutineCtx {
   splits: number[] // 피쉬나 a·b 번호
   key: Key // 오늘의 조
   repQueue: number[] // 레퍼토리 오늘 할 구간 id
+  scaleSet: ScaleSet // 저장한 5도권 묶음
 }
 
 export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
   if (item.refType === 'free') return []
-  if (item.refType === 'scale') return scaleQueue(ctx.key)
+  if (item.refType === 'scale') return item.from === 1 ? circleQueue(ctx.scaleSet) : scaleQueue(ctx.key)
   if (item.refType === 'rep') return ctx.repQueue
   return bookItems(item.refType, ctx.splits)
     .filter(it => it.no >= item.from && it.no <= item.to)
@@ -128,6 +129,7 @@ export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
 export function routineLabel(item: RoutineItem, key?: Key) {
   if (item.refType === 'free') return item.title
   if (item.refType === 'rep') return '레퍼토리 · 오늘 할 구간'
+  if (item.refType === 'scale' && item.from === 1) return '스케일·아르페지오 · 5도권 묶음'
   if (item.refType === 'scale') return key ? `스케일·아르페지오 · ${key} / ${relativeMinor(key)}` : '스케일·아르페지오 (오늘의 조)'
   const lab = item.refType === 'pischna' ? pischnaLabel : String
   const range = item.from === item.to ? lab(item.from) : `${lab(item.from)}–${lab(item.to)}`

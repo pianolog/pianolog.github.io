@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Book, Hand, Key } from '../data/exercises'
+import type { Book, Hand, Key, ScaleSet } from '../data/exercises'
 
 /** 기록 종류: 기초(하농·피쉬나·스케일) / 자유 / 레퍼토리 구간 / 런스루 */
 export type RefType = Book | 'free' | 'section' | 'run'
@@ -40,7 +40,7 @@ export interface RoutineItem {
   id?: number
   order: number
   refType: RoutineType
-  from: number // 하농·피쉬나 시작 번호 (스케일은 오늘의 조라서 안 씀)
+  from: number // 하농·피쉬나 시작 번호 · 스케일은 0 = 오늘의 조, 1 = 저장한 5도권 묶음
   to: number // 끝 번호 (단일이면 from과 같음)
   title: string // 자유 항목 제목
   minutes: number
@@ -203,6 +203,7 @@ export interface Settings {
   pischnaBook: BookMap
   pischnaSplits: number[] // a·b로 나뉜 피쉬나 번호
   dailyReviewMax: number // 하루 복습 구간 상한
+  scaleSet: ScaleSet // 저장한 5도권 묶음
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -216,7 +217,8 @@ export const DEFAULT_SETTINGS: Settings = {
   pischnaBook: { scoreId: null, pages: {} },
   // Schirmer 판(Library of Musical Classics Vol. 792, Wolff·Riemann 편집)에서 a·b로 나뉜 번호
   pischnaSplits: [1, 2, 5, 6, 15, 16, 20],
-  dailyReviewMax: 6
+  dailyReviewMax: 6,
+  scaleSet: { keys: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], start: 0, dir: 'cw', kinds: ['ms', 'ma', 'ns', 'na'] }
 }
 
 export async function loadSettings(): Promise<Settings> {

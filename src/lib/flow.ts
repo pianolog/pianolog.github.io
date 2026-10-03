@@ -31,9 +31,10 @@ export function useRoutineCtx(settings: Settings, entries: Entry[]): RoutineCtx 
     () => ({
       splits: settings.pischnaSplits,
       key,
-      repQueue: recommend(rep.sections, rep.pieces, rep.ddays, rep.lessons, { limit: settings.dailyReviewMax, minutes: 60 }).map(p => p.section.id!)
+      repQueue: recommend(rep.sections, rep.pieces, rep.ddays, rep.lessons, { limit: settings.dailyReviewMax, minutes: 60 }).map(p => p.section.id!),
+      scaleSet: settings.scaleSet
     }),
-    [settings.pischnaSplits, settings.dailyReviewMax, key, rep]
+    [settings.pischnaSplits, settings.dailyReviewMax, settings.scaleSet, key, rep]
   )
 }
 
@@ -45,7 +46,8 @@ export async function nextRoutineTarget(routineId: number): Promise<PracticeTarg
   const ctx: RoutineCtx = {
     splits: s.pischnaSplits,
     key,
-    repQueue: recommend(rep.sections, rep.pieces, rep.ddays, rep.lessons, { limit: s.dailyReviewMax, minutes: 60 }).map(p => p.section.id!)
+    repQueue: recommend(rep.sections, rep.pieces, rep.ddays, rep.lessons, { limit: s.dailyReviewMax, minutes: 60 }).map(p => p.section.id!),
+    scaleSet: s.scaleSet
   }
   const i = routine.findIndex(r => r.id === routineId)
   const next = routine

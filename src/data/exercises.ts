@@ -71,6 +71,38 @@ export function scaleQueue(key: Key) {
   return [scaleNo(0, i), scaleNo(0, i + 12), scaleNo(1, i), scaleNo(1, i + 12)]
 }
 
+// ── 5도권 묶음 ──
+
+/** ms 장조 스케일, ma 장조 아르페지오, ns 단조 스케일, na 단조 아르페지오 */
+export type ScaleKind = 'ms' | 'ma' | 'ns' | 'na'
+export const SCALE_KINDS: { id: ScaleKind; label: string }[] = [
+  { id: 'ms', label: '장조 스케일' },
+  { id: 'ma', label: '장조 아르페지오' },
+  { id: 'ns', label: '단조 스케일' },
+  { id: 'na', label: '단조 아르페지오' }
+]
+
+export interface ScaleSet {
+  keys: number[] // 고른 조 (KEYS 위치 0–11)
+  start: number // 시작 조
+  dir: 'cw' | 'ccw' // 5도씩(시계 방향) / 4도씩(반시계 방향)
+  kinds: ScaleKind[]
+}
+
+/** 시작 조부터 5도권 방향으로 돌며, 조마다 고른 종류를 묶어 차례로 */
+export function circleQueue(set: ScaleSet) {
+  const out: number[] = []
+  for (let i = 0; i < 12; i++) {
+    const k = (set.start + (set.dir === 'cw' ? i : -i) + 12) % 12
+    if (!set.keys.includes(k)) continue
+    for (const kind of SCALE_KINDS.map(x => x.id)) {
+      if (!set.kinds.includes(kind)) continue
+      out.push(scaleNo(kind === 'ma' || kind === 'na' ? 1 : 0, k + (kind === 'ns' || kind === 'na' ? 12 : 0)))
+    }
+  }
+  return out
+}
+
 export function variationsFor(book: Book | 'free', no: number): readonly string[] {
   if (book !== 'scale') return VARIATIONS
   if (isArpeggio(no)) return ARPEGGIO_VARIATIONS

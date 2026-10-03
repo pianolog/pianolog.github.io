@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { HANON_FROM, bookItems, type ScoreBook } from '../data/exercises'
+import { HANON_FROM, bookItems, circleQueue, type ScoreBook } from '../data/exercises'
+import { CircleSheet } from './CircleSheet'
 import { Icon } from '../components/Icon'
 import { Segmented, Sheet, SheetHead } from '../components/ui'
 import { db, type RoutineType } from '../lib/db'
@@ -42,6 +43,8 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
   }
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState(15)
+  const [scaleMode, setScaleMode] = useState(0)
+  const [circle, setCircle] = useState(false)
 
   const valid = type === 'free' ? title.trim().length > 0 : type === 'scale' || type === 'rep' ? true : to >= from
 
@@ -49,7 +52,7 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
     if (!valid) return
     const order = routine.length ? Math.max(...routine.map(r => r.order)) + 1 : 0
     const ranged = type === 'hanon' || type === 'pischna'
-    await db.routine.add({ order, refType: type, from: ranged ? from : 0, to: ranged ? to : 0, title: type === 'free' ? title.trim() : '', minutes: minutes || 5 })
+    await db.routine.add({ order, refType: type, from: ranged ? from : type === 'scale' ? scaleMode : 0, to: ranged ? to : 0, title: type === 'free' ? title.trim() : '', minutes: minutes || 5 })
     setTitle('')
   }
 
@@ -99,7 +102,10 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
           {type === 'free' ? (
             <input className="field" placeholder="예) 쇼팽 에튀드 Op.10 No.4" value={title} onChange={e => setTitle(e.target.value)} style={{ flex: 1, minWidth: 240, background: 'var(--s1)' }} />
           ) : type === 'scale' ? (
-            <span style={{ flex: 1, fontSize: 15, color: 'var(--ink2)' }}>그날의 조로 장조·단조 스케일과 아르페지오 4개</span>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <Segmented value={scaleMode} onChange={setScaleMode} options={[{ value: 0, label: '오늘의 조 4개' }, { value: 1, label: '5도권 묶음' }]} />
+              {scaleMode === 1 && <button className="link" onClick={() => setCircle(true)}>묶음 편집 ({circleQueue(settings.scaleSet).length}항목)</button>}
+            </div>
           ) : type === 'rep' ? (
             <span style={{ flex: 1, fontSize: 15, color: 'var(--ink2)' }}>앱이 고른 오늘 할 구간 (복습일·취약·레슨 지적·D-day 기준)</span>
           ) : (
@@ -122,6 +128,7 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
           <Icon name="plus" /> 추가
         </button>
       </div>
+      {circle && <CircleSheet saveOnly onClose={() => setCircle(false)} />}
     </Sheet>
   )
 }

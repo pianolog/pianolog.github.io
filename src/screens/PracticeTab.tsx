@@ -5,6 +5,7 @@ import { Segmented, StatusIcon } from '../components/ui'
 import { useEntries, useRoutine, useSettings } from '../lib/hooks'
 import { routineLabel, routineProgress } from '../lib/stats'
 import { targetFor, useRoutineCtx } from '../lib/flow'
+import { CircleSheet } from './CircleSheet'
 import { dateKey } from '../lib/time'
 import { useNav } from '../nav'
 
@@ -16,6 +17,7 @@ export function PracticeTab() {
   const settings = useSettings()
   const [book, setBook] = useState<ScoreBook | 'scale' | 'arpeggio'>('hanon')
   const [free, setFree] = useState('')
+  const [circle, setCircle] = useState(false)
   const ctx = useRoutineCtx(settings, entries)
   const key = ctx.key
   const today = dateKey()
@@ -80,6 +82,9 @@ export function PracticeTab() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button className="btn" style={{ alignSelf: 'flex-start', marginBottom: 6 }} onClick={() => setCircle(true)}>
+                5도권으로 묶어서 연습
+              </button>
               {[0, 12].map(off => (
                 <div key={off} style={{ display: 'grid', gridTemplateColumns: '64px repeat(12, minmax(0, 1fr))', gap: 6, alignItems: 'center' }}>
                   <span className="caption">{off ? '단조' : '장조'}</span>
@@ -119,6 +124,7 @@ export function PracticeTab() {
           )}
         </div>
       </div>
+      {circle && <CircleSheet onClose={() => setCircle(false)} />}
     </div>
   )
 }

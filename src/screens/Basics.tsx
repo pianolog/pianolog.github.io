@@ -7,6 +7,7 @@ import { coverage, exerciseStats, todayKey, type ExerciseStat } from '../lib/sta
 import { agoLabel, daysAgo } from '../lib/time'
 import { useNav } from '../nav'
 import { KeySheet } from './KeySheet'
+import { CircleSheet } from './CircleSheet'
 
 const MIX = [0, 16, 32, 50, 72, 100]
 const level = (b: number) => (!b ? 0 : b < 76 ? 1 : b < 88 ? 2 : b < 100 ? 3 : b < 112 ? 4 : 5)
@@ -66,6 +67,7 @@ function ScaleMatrix() {
   const stats = useMemo(() => exerciseStats(entries, 'scale'), [entries])
   const key = todayKey(settings, entries)
   const [pickKey, setPickKey] = useState(false)
+  const [circle, setCircle] = useState(false)
   const COLS: { label: string; kind: 0 | 1; minor: boolean }[] = [
     { label: '장조 스케일', kind: 0, minor: false },
     { label: '장조 아르페지오', kind: 1, minor: false },
@@ -82,7 +84,10 @@ function ScaleMatrix() {
           <span className="serif" style={{ fontSize: 20, fontWeight: 600, color: 'var(--accentText)' }}>{key} / {MINORS[KEYS.indexOf(key)]}</span>
         </button>
         <span className="caption">{touched} / 48칸 연습함</span>
-        <button className="btn primary sm" style={{ marginLeft: 'auto', height: 48 }} onClick={() => nav.startPractice({ refType: 'scale', queue: scaleQueue(key) })}>
+        <button className="btn sm" style={{ marginLeft: 'auto', height: 48 }} onClick={() => setCircle(true)}>
+          5도권 묶음
+        </button>
+        <button className="btn primary sm" style={{ height: 48 }} onClick={() => nav.startPractice({ refType: 'scale', queue: scaleQueue(key) })}>
           <PlayIcon size={18} /> 오늘의 조 4개
         </button>
       </div>
@@ -124,6 +129,7 @@ function ScaleMatrix() {
         <span>칸 색 = 최고 클린 BPM</span>
       </div>
       {pickKey && <KeySheet onClose={() => setPickKey(false)} />}
+      {circle && <CircleSheet onClose={() => setCircle(false)} />}
     </>
   )
 }
