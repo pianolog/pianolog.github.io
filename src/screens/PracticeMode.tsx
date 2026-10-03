@@ -2,26 +2,27 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { exerciseTitle, variationsFor, type Hand, type Key } from '../data/exercises'
 import { Icon, PauseIcon, PlayIcon } from '../components/Icon'
 import { Sheet, SheetHead, useToast } from '../components/ui'
-import { db, loadSettings, type Entry } from '../lib/db'
+import { db, type Entry } from '../lib/db'
 import { useEntries, useNow, useSettings, useWakeLock } from '../lib/hooks'
 import { metronome, useMetronome, type Subdivision } from '../lib/metronome'
-import { routineLabel, routineProgress, todayKey } from '../lib/stats'
+import { todayKey } from '../lib/stats'
 import { clock, dateKey } from '../lib/time'
-import type { PracticeTarget } from '../nav'
+import { useNav, type BasicTarget, type PracticeTarget } from '../nav'
+import { nextRoutineTarget, targetLabel } from '../lib/flow'
 import { FinishSheet, type FinishData } from './FinishSheet'
 import { ScoreScreen } from './ScoreScreen'
 import { ScorePicker } from './ScorePicker'
-import { targetFor } from './Today'
 
 interface Ladder {
   start: number
   target: number
 }
 
-const ladderKey = (t: PracticeTarget, no: number) => (t.refType === 'free' ? `ladder:free:${t.title}` : `ladder:${t.refType}:${no}`)
+const ladderKey = (t: BasicTarget, no: number) => (t.refType === 'free' ? `ladder:free:${t.title}` : `ladder:${t.refType}:${no}`)
 const DEFAULT_LADDER: Ladder = { start: 60, target: 104 }
 
-export function PracticeMode({ target: initialTarget, onClose }: { target: PracticeTarget; onClose: () => void }) {
+export function PracticeMode({ target: initialTarget, onClose }: { target: BasicTarget; onClose: () => void }) {
+  const nav = useNav()
   const toast = useToast()
   const settings = useSettings()
   const entries = useEntries()
@@ -115,15 +116,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
   useEffect(() => {
     if (!target.routineId) return setNextRoutine(null)
     let alive = true
-    void (async () => {
-      const routine = await db.routine.orderBy('order').toArray()
-      const today = await db.entries.where('date').equals(dateKey()).toArray()
-      const s = await loadSettings()
-      const k = todayKey(s.todayKeyMode, await db.entries.toArray())
-      const i = routine.findIndex(r => r.id === target.routineId)
-      const next = routine.slice(i + 1).map(r => routineProgress(r, today, { splits: s.pischnaSplits, key: k })).find(p => p.status !== 'done' && targetFor(p, k))
-      if (alive) setNextRoutine(next ? targetFor(next, k) : null)
-    })()
+    void nextRoutineTarget(target.routineId).then(t => alive && setNextRoutine(t))
     return () => {
       alive = false
     }
@@ -134,7 +127,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
     queueNext !== null && target.refType !== 'free'
       ? `${exerciseTitle(target.refType, queueNext)}${target.refType === 'hanon' && key ? ` · ${key} major` : ''}`
       : nextRoutine
-        ? nextRoutineLabel(nextRoutine)
+        ? targetLabel(nextRoutine)
         : null
   const varList = variationsFor(target.refType, no)
 
@@ -166,6 +159,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
     toast(`${title} 저장됨`)
     if (!goNext) return onClose()
     if (queueNext) setIdx(i => i + 1)
+    else if (nextRoutine?.refType === 'section') nav.startPractice(nextRoutine)
     else if (nextRoutine) {
       setTarget(nextRoutine)
       setIdx(0)
@@ -369,11 +363,6 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Pract
       )}
     </div>
   )
-}
-
-function nextRoutineLabel(t: PracticeTarget) {
-  if (t.refType === 'free') return t.title
-  return routineLabel({ order: 0, refType: t.refType, from: t.queue[0], to: t.queue[t.queue.length - 1], title: '', minutes: 0 }, t.key)
 }
 
 function LadderSheet({ value, onSave, onClose }: { value: Ladder; onSave: (l: Ladder) => void; onClose: () => void }) {

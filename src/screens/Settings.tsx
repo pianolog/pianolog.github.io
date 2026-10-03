@@ -61,6 +61,9 @@ export function SettingsPage() {
           <Row label="오늘의 조" sub="하농 조옮김 기준">
             <Segmented value={s.todayKeyMode} onChange={v => saveSetting('todayKeyMode', v)} options={[{ value: 'cycle', label: '5도권 순환' }, { value: 'stale', label: '오래 안 친 조' }]} />
           </Row>
+          <Row label="하루 복습 구간" sub="오늘 할 구간 추천 최대 개수">
+            <Segmented value={s.dailyReviewMax} onChange={v => saveSetting('dailyReviewMax', v)} options={[4, 6, 8, 10].map(n => ({ value: n, label: `${n}개` }))} />
+          </Row>
           <Row label="템포 사다리 간격">
             <Segmented value={s.ladderStep} onChange={v => saveSetting('ladderStep', v)} options={[2, 4, 6, 8].map(n => ({ value: n, label: `+${n}` }))} />
           </Row>
@@ -139,7 +142,7 @@ export function SettingsPage() {
             />
           </div>
           <div className="caption" style={{ marginTop: 12, lineHeight: 1.6 }}>
-            내보내기를 누르면 공유 시트가 열려요 → "파일에 저장"으로 iCloud Drive에 보관하세요. 악보 PDF는 백업에 포함되지 않아요.
+            내보내기를 누르면 공유 시트가 열려요 → "파일에 저장"으로 iCloud Drive에 보관하세요. 악보 PDF와 런스루 녹음은 백업에 포함되지 않아요.
           </div>
         </div>
       </div>

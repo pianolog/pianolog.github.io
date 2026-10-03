@@ -1,0 +1,298 @@
+import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { Icon } from '../../components/Icon'
+import { Sheet, SheetHead, useToast } from '../../components/ui'
+import { db, type DDay, type Piece, type RepList, type Section } from '../../lib/db'
+import { LIST_COLORS, STAGES, newSection, pieceName, splitMeasures } from '../../lib/repertoire'
+import { dateKey } from '../../lib/time'
+
+const fieldOnSheet = { background: 'var(--bg)' }
+
+export function Dot({ color, size = 8 }: { color: string; size?: number }) {
+  return <span style={{ width: size, height: size, borderRadius: '50%', background: color, flex: 'none', display: 'inline-block' }} />
+}
+
+export function StageBars({ stage, w = 24 }: { stage: number; w?: number }) {
+  return (
+    <div style={{ display: 'flex', gap: 3 }}>
+      {STAGES.map((_, j) => (
+        <span key={j} style={{ width: w, height: 5, borderRadius: 3, background: j < stage ? 'var(--ink3)' : j === stage ? (stage === 5 ? 'var(--ok)' : 'var(--accent)') : 'var(--line)' }} />
+      ))}
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span className="sec-label">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function Num({ value, onChange, w = 90 }: { value: number; onChange: (n: number) => void; w?: number }) {
+  return (
+    <input
+      className="field"
+      inputMode="numeric"
+      value={value || ''}
+      onChange={e => {
+        const n = parseInt(e.target.value.replace(/\D/g, ''), 10)
+        onChange(Number.isNaN(n) ? 0 : n)
+      }}
+      style={{ ...fieldOnSheet, width: w, textAlign: 'center', fontWeight: 600 }}
+    />
+  )
+}
+
+// ── 레퍼토리 목록 ──
+
+export function ListSheet({ list, onClose }: { list?: RepList; onClose: () => void }) {
+  const [name, setName] = useState(list?.name ?? '')
+  const [color, setColor] = useState(list?.color ?? LIST_COLORS[0])
+  const save = async () => {
+    if (!name.trim()) return
+    if (list?.id) await db.lists.update(list.id, { name: name.trim(), color })
+    else {
+      const n = await db.lists.count()
+      await db.lists.add({ name: name.trim(), color, order: n })
+    }
+    onClose()
+  }
+  const remove = async () => {
+    if (!list?.id || !window.confirm(`"${list.name}" 목록을 지울까요? 곡은 지워지지 않아요.`)) return
+    const pieces = await db.pieces.where('listIds').equals(list.id).toArray()
+    await db.transaction('rw', db.pieces, db.lists, async () => {
+      for (const p of pieces) await db.pieces.update(p.id!, { listIds: p.listIds.filter(x => x !== list.id) })
+      await db.lists.delete(list.id!)
+    })
+    onClose()
+  }
+  return (
+    <Sheet onClose={onClose}>
+      <SheetHead title={list ? '목록 편집' : '새 목록'} sub="예) 이번 실기, 연주회, 반주, 유지곡, 언젠가 칠 곡" onClose={onClose} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 22 }}>
+        <Field label="이름">
+          <input className="field" style={fieldOnSheet} value={name} onChange={e => setName(e.target.value)} placeholder="이번 실기" autoFocus />
+        </Field>
+        <Field label="색">
+          <div style={{ display: 'flex', gap: 10 }}>
+            {LIST_COLORS.map(c => (
+              <button key={c} onClick={() => setColor(c)} style={{ width: 44, height: 44, borderRadius: '50%', background: c, outline: c === color ? '3px solid var(--ink)' : 'none', outlineOffset: 2 }} aria-label={c} />
+            ))}
+          </div>
+        </Field>
+      </div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 26 }}>
+        {list && <button className="btn" style={{ color: 'var(--alert)' }} onClick={remove}><Icon name="trash" /> 지우기</button>}
+        <button className="btn primary" style={{ flex: 1, height: 60 }} disabled={!name.trim()} onClick={save}>저장</button>
+      </div>
+    </Sheet>
+  )
+}
+
+// ── 곡 ──
+
+export function PieceSheet({ piece, defaultListId, onClose, onCreated }: { piece?: Piece; defaultListId?: number; onClose: () => void; onCreated?: (id: number) => void }) {
+  const lists = useLiveQuery(() => db.lists.orderBy('order').toArray(), [], [])
+  const [title, setTitle] = useState(piece?.title ?? '')
+  const [composer, setComposer] = useState(piece?.composer ?? '')
+  const [opus, setOpus] = useState(piece?.opus ?? '')
+  const [memo, setMemo] = useState(piece?.memo ?? '')
+  const [listIds, setListIds] = useState<number[]>(piece?.listIds ?? (defaultListId ? [defaultListId] : []))
+  const [total, setTotal] = useState(0)
+  const [size, setSize] = useState(16)
+  const [target, setTarget] = useState(60)
+  const toast = useToast()
+
+  const save = async () => {
+    if (!title.trim()) return
+    const data = { title: title.trim(), composer: composer.trim(), opus: opus.trim(), memo: memo.trim(), listIds }
+    if (piece?.id) {
+      await db.pieces.update(piece.id, data)
+      onClose()
+      return
+    }
+    const id = (await db.pieces.add({ ...data, archived: 0, createdAt: Date.now(), scoreId: null })) as number
+    if (total > 0 && size > 0) await db.sections.bulkAdd(splitMeasures(total, size).map((l, i) => newSection(id, i, l, target || 60)))
+    toast(`${title.trim()} 추가됨`)
+    onClose()
+    onCreated?.(id)
+  }
+
+  return (
+    <Sheet onClose={onClose}>
+      <SheetHead title={piece ? '곡 정보' : '곡 추가'} sub="곡명만 있으면 돼요. 악장·곡 단위로 따로 만들어도 좋아요." onClose={onClose} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 22 }}>
+        <Field label="곡명 (필수)">
+          <input className="field" style={fieldOnSheet} value={title} onChange={e => setTitle(e.target.value)} placeholder="소나타 Op.110 1악장" autoFocus />
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="작곡가">
+            <input className="field" style={fieldOnSheet} value={composer} onChange={e => setComposer(e.target.value)} placeholder="베토벤" />
+          </Field>
+          <Field label="작품번호·메모">
+            <input className="field" style={fieldOnSheet} value={opus} onChange={e => setOpus(e.target.value)} placeholder="A♭ major · Moderato cantabile" />
+          </Field>
+        </div>
+        <Field label="목록 (여러 개 가능)">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {lists.length === 0 && <span className="caption">레퍼토리 탭에서 목록을 먼저 만들면 여기서 고를 수 있어요.</span>}
+            {lists.map(l => {
+              const on = listIds.includes(l.id!)
+              return (
+                <button key={l.id} className={`pick${on ? ' on' : ''}`} style={{ gap: 8 }} onClick={e => { e.preventDefault(); setListIds(x => (on ? x.filter(v => v !== l.id) : [...x, l.id!])) }}>
+                  <Dot color={l.color} /> {l.name}
+                </button>
+              )
+            })}
+          </div>
+        </Field>
+        {!piece && (
+          <div style={{ background: 'var(--bg)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <span className="sec-label">구간 자동으로 나누기 (선택)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span className="caption">총</span>
+              <Num value={total} onChange={setTotal} w={80} />
+              <span className="caption">마디를</span>
+              <Num value={size} onChange={setSize} w={70} />
+              <span className="caption">마디씩, 목표</span>
+              <Num value={target} onChange={setTarget} w={80} />
+              <span className="caption">BPM</span>
+            </div>
+            {total > 0 && size > 0 && <span className="caption">{splitMeasures(total, size).join(' · ')}</span>}
+          </div>
+        )}
+        <Field label="메모">
+          <input className="field" style={fieldOnSheet} value={memo} onChange={e => setMemo(e.target.value)} placeholder="편집본, 운지 출처 등" />
+        </Field>
+      </div>
+      <button className="btn primary" style={{ marginTop: 26, height: 60 }} disabled={!title.trim()} onClick={save}>
+        {piece ? '저장' : '곡 추가'}
+      </button>
+    </Sheet>
+  )
+}
+
+// ── 구간 ──
+
+export function SectionSheet({ section, pieceId, nextOrder, onClose, onPractice }: { section?: Section; pieceId: number; nextOrder: number; onClose: () => void; onPractice?: (id: number) => void }) {
+  const [s, setS] = useState<Section>(section ?? newSection(pieceId, nextOrder, '', 60))
+  const set = (p: Partial<Section>) => setS(x => ({ ...x, ...p }))
+  const save = async () => {
+    if (!s.label.trim()) return
+    const data = { ...s, label: s.label.trim(), ladderStart: Math.min(s.ladderStart, s.targetBpm - 4), bpm: Math.min(s.bpm, s.targetBpm) }
+    if (section?.id) await db.sections.put(data)
+    else await db.sections.add(data)
+    onClose()
+  }
+  const remove = async () => {
+    if (!section?.id || !window.confirm(`${section.label} 구간을 지울까요? 연습 기록은 남아요.`)) return
+    await db.sections.delete(section.id)
+    onClose()
+  }
+  return (
+    <Sheet onClose={onClose}>
+      <SheetHead title={section ? '구간' : '구간 추가'} onClose={onClose} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12 }}>
+          <Field label="구간 이름">
+            <input className="field" style={fieldOnSheet} value={s.label} onChange={e => set({ label: e.target.value })} placeholder="m.33–48" />
+          </Field>
+          <Field label="메모">
+            <input className="field" style={fieldOnSheet} value={s.note} onChange={e => set({ note: e.target.value })} placeholder="왼손 아르페지오" />
+          </Field>
+        </div>
+        <Field label="단계">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 6 }}>
+            {STAGES.map((name, i) => (
+              <button key={name} className={`pick${s.stage === i ? ' on' : ''}`} style={{ padding: 0, fontSize: 14 }} onClick={e => { e.preventDefault(); set({ stage: i }) }}>
+                {name}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <Field label="사다리 시작"><Num value={s.ladderStart} onChange={v => set({ ladderStart: v })} /></Field>
+          <Field label="지금 BPM"><Num value={s.bpm} onChange={v => set({ bpm: v })} /></Field>
+          <Field label="목표 BPM"><Num value={s.targetBpm} onChange={v => set({ targetBpm: v })} /></Field>
+          <Field label="연속 성공 기준"><Num value={s.streakGoal} onChange={v => set({ streakGoal: Math.max(1, Math.min(10, v)) })} w={70} /></Field>
+          <Field label="악보 페이지"><Num value={s.page ?? 0} onChange={v => set({ page: v || undefined })} w={70} /></Field>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className={`pick${s.weak ? ' on' : ''}`} onClick={e => { e.preventDefault(); set({ weak: !s.weak }) }} style={s.weak ? { borderColor: 'var(--alert)', color: 'var(--alert)', background: 'color-mix(in oklch, var(--alert) 12%, var(--s1))' } : undefined}>
+            취약 구간
+          </button>
+          <span className="caption">취약 구간은 오늘 할 구간에 먼저 들어가요.</span>
+          {section && (
+            <button className="pick" style={{ marginLeft: 'auto' }} onClick={e => { e.preventDefault(); set({ dueDate: dateKey() }) }}>
+              오늘 복습으로
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 26 }}>
+        {section && <button className="btn" style={{ color: 'var(--alert)' }} onClick={remove}><Icon name="trash" /></button>}
+        {section && onPractice && (
+          <button className="btn" onClick={async () => { await save(); onPractice(section.id!) }}>
+            저장하고 연습
+          </button>
+        )}
+        <button className="btn primary" style={{ flex: 1, height: 60 }} disabled={!s.label.trim()} onClick={save}>저장</button>
+      </div>
+    </Sheet>
+  )
+}
+
+// ── D-day ──
+
+export function DdaySheet({ dday, onClose }: { dday?: DDay; onClose: () => void }) {
+  const pieces = useLiveQuery(() => db.pieces.filter(p => !p.archived).toArray(), [], [])
+  const [title, setTitle] = useState(dday?.title ?? '')
+  const [date, setDate] = useState(dday?.date ?? dateKey())
+  const [pinned, setPinned] = useState(dday?.pinned ?? true)
+  const [pieceIds, setPieceIds] = useState<number[]>(dday?.pieceIds ?? [])
+  const save = async () => {
+    if (!title.trim() || !date) return
+    const data = { title: title.trim(), date, pinned, pieceIds }
+    if (dday?.id) await db.ddays.update(dday.id, data)
+    else await db.ddays.add(data)
+    onClose()
+  }
+  return (
+    <Sheet onClose={onClose}>
+      <SheetHead title={dday ? 'D-day 편집' : 'D-day 추가'} sub="이름과 날짜만 있으면 돼요." onClose={onClose} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 22 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12 }}>
+          <Field label="이름">
+            <input className="field" style={fieldOnSheet} value={title} onChange={e => setTitle(e.target.value)} placeholder="기말 실기" autoFocus />
+          </Field>
+          <Field label="날짜">
+            <input className="field" style={fieldOnSheet} type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="연결할 곡 (선택) — 날짜가 가까워지면 이 곡 구간이 먼저 추천돼요">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {pieces.length === 0 && <span className="caption">아직 곡이 없어요.</span>}
+            {pieces.map(p => {
+              const on = pieceIds.includes(p.id!)
+              return (
+                <button key={p.id} className={`pick${on ? ' on' : ''}`} onClick={e => { e.preventDefault(); setPieceIds(x => (on ? x.filter(v => v !== p.id) : [...x, p.id!])) }}>
+                  {pieceName(p)}
+                </button>
+              )
+            })}
+          </div>
+        </Field>
+        <button className={`pick${pinned ? ' on' : ''}`} style={{ alignSelf: 'flex-start' }} onClick={e => { e.preventDefault(); setPinned(!pinned) }}>
+          {pinned ? '✓ ' : ''}오늘 화면에 고정
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 26 }}>
+        {dday && <button className="btn" style={{ color: 'var(--alert)' }} onClick={async () => { await db.ddays.delete(dday.id!); onClose() }}><Icon name="trash" /></button>}
+        <button className="btn primary" style={{ flex: 1, height: 60 }} disabled={!title.trim() || !date} onClick={save}>저장</button>
+      </div>
+    </Sheet>
+  )
+}

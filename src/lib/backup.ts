@@ -1,17 +1,19 @@
 import { db } from './db'
 import { dateKey } from './time'
 
-// 기록 백업 (JSON). 악보 PDF는 용량이 커서 제외 — 악보 목록 이름만 남긴다.
+// 기록 백업 (JSON). 악보 PDF와 런스루 녹음은 용량이 커서 제외한다.
 
-const VERSION = 1
+const VERSION = 2
+const REP_TABLES = ['lists', 'pieces', 'sections', 'runs', 'ddays', 'lessons'] as const
 
 export async function exportBackup() {
-  const [sessions, entries, routine, settings, scores] = await Promise.all([
+  const [sessions, entries, routine, settings, scores, ...rep] = await Promise.all([
     db.sessions.toArray(),
     db.entries.toArray(),
     db.routine.toArray(),
     db.settings.toArray(),
-    db.scores.toArray()
+    db.scores.toArray(),
+    ...REP_TABLES.map(t => db.table(t).toArray())
   ])
   const data = {
     app: 'piano-practice',
@@ -21,7 +23,8 @@ export async function exportBackup() {
     entries,
     routine,
     settings,
-    scoreNames: scores.map(s => ({ id: s.id, name: s.name, pageCount: s.pageCount }))
+    scoreNames: scores.map(s => ({ id: s.id, name: s.name, pageCount: s.pageCount })),
+    ...Object.fromEntries(REP_TABLES.map((t, i) => [t, t === 'runs' ? rep[i].map(r => ({ ...r, recordingId: undefined })) : rep[i]]))
   }
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
   const name = `피아노연습-백업-${dateKey()}.json`
@@ -47,11 +50,17 @@ export async function exportBackup() {
 export async function importBackup(file: File) {
   const data = JSON.parse(await file.text())
   if (data?.app !== 'piano-practice') throw new Error('이 앱의 백업 파일이 아니에요.')
-  await db.transaction('rw', [db.sessions, db.entries, db.routine, db.settings], async () => {
+  await db.transaction('rw', [db.sessions, db.entries, db.routine, db.settings, ...REP_TABLES.map(t => db.table(t))], async () => {
     await Promise.all([db.sessions.clear(), db.entries.clear(), db.routine.clear()])
     await db.sessions.bulkAdd(data.sessions ?? [])
     await db.entries.bulkAdd(data.entries ?? [])
     await db.routine.bulkAdd(data.routine ?? [])
+    for (const t of REP_TABLES) {
+      if (!data[t]) continue
+      await db.table(t).clear()
+      // 곡의 악보 연결은 이 기기의 PDF id라서 지운다
+      await db.table(t).bulkAdd(t === 'pieces' ? data[t].map((p: { scoreId?: number }) => ({ ...p, scoreId: null })) : data[t])
+    }
     // 악보 연결은 이 기기의 PDF id에 묶여 있어서 가져오지 않는다
     const settings = (data.settings ?? []).filter((s: { key: string }) => s.key !== 'hanonBook' && s.key !== 'pischnaBook')
     await db.settings.bulkPut(settings)

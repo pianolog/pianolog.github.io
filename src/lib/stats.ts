@@ -103,11 +103,13 @@ export function nextKeyLabel(mode: TodayKeyMode) {
 export interface RoutineCtx {
   splits: number[] // 피쉬나 a·b 번호
   key: Key // 오늘의 조
+  repQueue: number[] // 레퍼토리 오늘 할 구간 id
 }
 
 export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
   if (item.refType === 'free') return []
   if (item.refType === 'scale') return scaleQueue(ctx.key)
+  if (item.refType === 'rep') return ctx.repQueue
   return bookItems(item.refType, ctx.splits)
     .filter(it => it.no >= item.from && it.no <= item.to)
     .map(it => it.no)
@@ -115,6 +117,7 @@ export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
 
 export function routineLabel(item: RoutineItem, key?: Key) {
   if (item.refType === 'free') return item.title
+  if (item.refType === 'rep') return '레퍼토리 · 오늘 할 구간'
   if (item.refType === 'scale') return key ? `스케일·아르페지오 · ${key} / ${relativeMinor(key)}` : '스케일·아르페지오 (오늘의 조)'
   const lab = item.refType === 'pischna' ? pischnaLabel : String
   const range = item.from === item.to ? lab(item.from) : `${lab(item.from)}–${lab(item.to)}`
@@ -140,7 +143,8 @@ export function routineProgress(item: RoutineItem, todayEntries: Entry[], ctx: R
     return { item, nums: [], done: mine.length ? 1 : 0, total: 1, seconds, status, nextNo: null }
   }
   const nums = routineNumbers(item, ctx)
-  const mine = todayEntries.filter(e => e.refType === item.refType && nums.includes(e.refNo))
+  const refType = item.refType === 'rep' ? 'section' : item.refType
+  const mine = todayEntries.filter(e => e.refType === refType && nums.includes(e.refNo))
   const doneSet = new Set(mine.map(e => e.refNo))
   const seconds = mine.reduce((a, e) => a + e.seconds, 0)
   const done = doneSet.size

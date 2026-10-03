@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { exerciseTitle } from '../data/exercises'
 import { Icon } from '../components/Icon'
-import { useToast } from '../components/ui'
+import { Segmented, useToast } from '../components/ui'
+import { Lessons } from './rep/Lessons'
 import { db } from '../lib/db'
 import { useEntries } from '../lib/hooks'
 import { secondsByDay } from '../lib/stats'
+import { entryTitle } from '../lib/repertoire'
 import { addDays, clock, dateKey, duration, parseDateKey, shortDate } from '../lib/time'
 
 const WEEKS = 53
@@ -19,6 +20,7 @@ function heatColor(sec: number) {
 export function Records() {
   const entries = useEntries()
   const toast = useToast()
+  const [view, setView] = useState<'cal' | 'lesson'>('cal')
   const byDay = useMemo(() => secondsByDay(entries), [entries])
   const [sel, setSel] = useState(dateKey())
 
@@ -49,7 +51,14 @@ export function Records() {
   return (
     <div className="screen">
       <div className="screen-inner">
-        <h1 className="page-title" style={{ paddingTop: 4 }}>기록</h1>
+        <div className="page-head">
+          <h1 className="page-title">기록</h1>
+          <Segmented value={view} onChange={setView} options={[{ value: 'cal', label: '연습 기록' }, { value: 'lesson', label: '레슨노트' }]} />
+        </div>
+        {view === 'lesson' ? (
+          <Lessons />
+        ) : (
+          <>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
           {[['이번 주', duration(weekSec)], ['이번 달', duration(monthSec)], ['전체', duration(totalSec)], ['연습한 날', `${days}일`]].map(([l, v]) => (
@@ -102,7 +111,7 @@ export function Records() {
             <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: '1px solid var(--line)', fontSize: 15 }}>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ fontWeight: 600 }}>
-                  {e.refType === 'free' ? e.title : exerciseTitle(e.refType, e.refNo)}
+                  {entryTitle(e)}
                   {e.key && <span className="serif" style={{ marginLeft: 8, color: 'var(--ink2)' }}>{e.key}</span>}
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -116,6 +125,8 @@ export function Records() {
             </div>
           ))}
         </div>
+          </>
+        )}
       </div>
     </div>
   )

@@ -3,10 +3,10 @@ import { KEYS, MINORS, bookItems, scaleNo, type ScoreBook } from '../data/exerci
 import { Icon, PlayIcon } from '../components/Icon'
 import { Segmented, StatusIcon } from '../components/ui'
 import { useEntries, useRoutine, useSettings } from '../lib/hooks'
-import { routineLabel, routineProgress, todayKey } from '../lib/stats'
+import { routineLabel, routineProgress } from '../lib/stats'
+import { targetFor, useRoutineCtx } from '../lib/flow'
 import { dateKey } from '../lib/time'
 import { useNav } from '../nav'
-import { targetFor } from './Today'
 
 /** 연습 탭: 루틴 항목, 번호 직접 고르기, 자유 연습 */
 export function PracticeTab() {
@@ -16,7 +16,8 @@ export function PracticeTab() {
   const settings = useSettings()
   const [book, setBook] = useState<ScoreBook | 'scale' | 'arpeggio'>('hanon')
   const [free, setFree] = useState('')
-  const key = todayKey(settings.todayKeyMode, entries)
+  const ctx = useRoutineCtx(settings, entries)
+  const key = ctx.key
   const today = dateKey()
   const todayEntries = useMemo(() => entries.filter(e => e.date === today), [entries, today])
   const refType = book === 'arpeggio' ? 'scale' : book
@@ -46,7 +47,7 @@ export function PracticeTab() {
               <span className="t">오늘의 루틴</span>
             </div>
             {routine.map(r => {
-              const p = routineProgress(r, todayEntries, { splits: settings.pischnaSplits, key })
+              const p = routineProgress(r, todayEntries, ctx)
               return (
                 <button key={r.id} onClick={() => { const t = targetFor(p, key); if (t) nav.startPractice(t) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, minHeight: 60, padding: '0 14px', textAlign: 'left' }}>
                   <StatusIcon status={p.status} />
