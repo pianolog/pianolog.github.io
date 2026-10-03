@@ -1,0 +1,220 @@
+import { useEffect, useRef, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { BOOK_NAME, BOOK_SIZE, type Book } from '../data/exercises'
+import { Icon } from '../components/Icon'
+import { Segmented, Sheet, SheetHead, useToast } from '../components/ui'
+import { db, saveSetting, type BookMap } from '../lib/db'
+import { exportBackup, importBackup } from '../lib/backup'
+import { useSettings } from '../lib/hooks'
+import { forgetScore } from '../lib/pdf'
+import { useNav } from '../nav'
+import { PdfUploadButton } from './ScorePicker'
+
+function Row({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span style={{ fontSize: 17, fontWeight: 600 }}>{label}</span>
+        {sub && <span className="caption">{sub}</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+export function SettingsPage() {
+  const nav = useNav()
+  const toast = useToast()
+  const s = useSettings()
+  const scores = useLiveQuery(() => db.scores.orderBy('createdAt').reverse().toArray(), [], [])
+  const [mapping, setMapping] = useState<Book | null>(null)
+  const [usage, setUsage] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    void navigator.storage?.estimate?.().then(e => setUsage(`${((e.usage ?? 0) / 1048576).toFixed(1)}MB 사용 중`))
+  }, [scores.length])
+
+  const removeScore = async (id: number, name: string) => {
+    if (!window.confirm(`"${name}" 악보를 iPad에서 지울까요?`)) return
+    forgetScore(id)
+    await db.scores.delete(id)
+    for (const b of ['hanonBook', 'pischnaBook'] as const) if (s[b].scoreId === id) await saveSetting(b, { ...s[b], scoreId: null })
+  }
+
+  return (
+    <div className="screen">
+      <div className="screen-inner">
+        <div>
+          <button className="back" onClick={nav.closePage}>
+            <Icon name="left" size={20} width={1.8} />
+            오늘
+          </button>
+          <h1 className="page-title">설정</h1>
+        </div>
+
+        <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <Row label="하루 목표 시간">
+            <Segmented value={s.dailyGoalMin} onChange={v => saveSetting('dailyGoalMin', v)} options={[60, 120, 180, 240, 300].map(m => ({ value: m, label: `${m / 60}시간` }))} />
+          </Row>
+          <Row label="오늘의 조" sub="하농 조옮김 기준">
+            <Segmented value={s.todayKeyMode} onChange={v => saveSetting('todayKeyMode', v)} options={[{ value: 'cycle', label: '5도권 순환' }, { value: 'stale', label: '오래 안 친 조' }]} />
+          </Row>
+          <Row label="템포 사다리 간격">
+            <Segmented value={s.ladderStep} onChange={v => saveSetting('ladderStep', v)} options={[2, 4, 6, 8].map(n => ({ value: n, label: `+${n}` }))} />
+          </Row>
+          <Row label="테마">
+            <Segmented value={s.theme} onChange={v => saveSetting('theme', v)} options={[{ value: 'system', label: '시스템' }, { value: 'dark', label: '다크' }, { value: 'light', label: '라이트' }]} />
+          </Row>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <span className="t">하농·피쉬나 악보<span className="sub">책 PDF 연결 + 번호별 페이지</span></span>
+          </div>
+          {(['hanon', 'pischna'] as Book[]).map(b => {
+            const map = b === 'hanon' ? s.hanonBook : s.pischnaBook
+            const sc = scores.find(x => x.id === map.scoreId)
+            const mapped = Object.keys(map.pages).length
+            return (
+              <Row key={b} label={BOOK_NAME[b]} sub={sc ? `${sc.name} · ${mapped}/60 번호 페이지 지정` : '연결된 PDF 없음'}>
+                <button className="btn sm" onClick={() => setMapping(b)}>{sc ? '편집' : '연결'}</button>
+              </Row>
+            )
+          })}
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <span className="t">악보 보관함<span className="sub">{usage}</span></span>
+            <PdfUploadButton />
+          </div>
+          {scores.length === 0 && <div className="empty">파일 앱·iCloud Drive의 PDF를 추가하면 오프라인에서도 열 수 있어요.</div>}
+          {scores.map(sc => (
+            <div key={sc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderTop: '1px solid var(--line)' }}>
+              <Icon name="book" />
+              <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{sc.name}</span>
+              <span className="caption">{sc.pageCount}쪽</span>
+              <button className="btn sm" onClick={() => nav.openScore(sc.id!, 1)}>열기</button>
+              <button className="btn icon sm" style={{ color: 'var(--alert)' }} onClick={() => removeScore(sc.id!, sc.name)} aria-label="삭제"><Icon name="trash" /></button>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <span className="t">백업<span className="sub">기록은 이 iPad 안에만 저장돼요</span></span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+            <button className="btn" onClick={() => exportBackup().catch(() => toast('내보내지 못했어요'))}>
+              <Icon name="download" /> 기록 내보내기 (JSON)
+            </button>
+            <button className="btn" onClick={() => fileRef.current?.click()}>
+              <Icon name="upload" /> 가져오기
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={async e => {
+                const f = e.target.files?.[0]
+                e.target.value = ''
+                if (!f || !window.confirm('지금 기록을 백업 파일 내용으로 바꿀까요? 되돌릴 수 없어요.')) return
+                try {
+                  const r = await importBackup(f)
+                  toast(`${r.entries}개 기록을 가져왔어요`)
+                } catch (err) {
+                  toast((err as Error).message || '가져오지 못했어요')
+                }
+              }}
+            />
+          </div>
+          <div className="caption" style={{ marginTop: 12, lineHeight: 1.6 }}>
+            내보내기를 누르면 공유 시트가 열려요 → "파일에 저장"으로 iCloud Drive에 보관하세요. 악보 PDF는 백업에 포함되지 않아요.
+          </div>
+        </div>
+      </div>
+
+      {mapping && <BookMapSheet book={mapping} value={mapping === 'hanon' ? s.hanonBook : s.pischnaBook} onClose={() => setMapping(null)} />}
+    </div>
+  )
+}
+
+function BookMapSheet({ book, value, onClose }: { book: Book; value: BookMap; onClose: () => void }) {
+  const scores = useLiveQuery(() => db.scores.orderBy('createdAt').reverse().toArray(), [], [])
+  const [scoreId, setScoreId] = useState(value.scoreId)
+  const [pages, setPages] = useState<Record<number, number>>(value.pages)
+  const [first, setFirst] = useState(value.pages[1] ?? 1)
+  const [per, setPer] = useState(1)
+  const toast = useToast()
+  const max = scores.find(x => x.id === scoreId)?.pageCount ?? 999
+
+  const autofill = () => {
+    const out: Record<number, number> = {}
+    for (let n = 1; n <= BOOK_SIZE; n++) out[n] = Math.min(max, first + (n - 1) * per)
+    setPages(out)
+  }
+
+  const save = async () => {
+    await saveSetting(book === 'hanon' ? 'hanonBook' : 'pischnaBook', { scoreId, pages })
+    toast('저장됨')
+    onClose()
+  }
+
+  const num = (v: string) => {
+    const n = parseInt(v.replace(/\D/g, ''), 10)
+    return Number.isNaN(n) ? 0 : n
+  }
+
+  return (
+    <Sheet onClose={onClose}>
+      <SheetHead title={`${BOOK_NAME[book]} 악보 연결`} sub="책 한 권짜리 PDF를 고르고, 각 번호가 시작하는 페이지를 적어요." onClose={onClose} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 18, alignItems: 'center' }}>
+        {scores.map(sc => (
+          <button key={sc.id} className={`pick${sc.id === scoreId ? ' on' : ''}`} onClick={() => setScoreId(sc.id!)}>
+            {sc.name}
+          </button>
+        ))}
+        <PdfUploadButton onAdded={setScoreId} />
+      </div>
+
+      <div style={{ marginTop: 22, background: 'var(--bg)', borderRadius: 16, padding: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span className="sec-label">빠르게 채우기</span>
+        <span className="caption">1번이</span>
+        <input className="field" inputMode="numeric" value={first || ''} onChange={e => setFirst(num(e.target.value))} style={{ width: 70, height: 48, textAlign: 'center', background: 'var(--s1)' }} />
+        <span className="caption">쪽, 번호당</span>
+        <input className="field" inputMode="numeric" value={per || ''} onChange={e => setPer(num(e.target.value))} style={{ width: 60, height: 48, textAlign: 'center', background: 'var(--s1)' }} />
+        <span className="caption">쪽</span>
+        <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={autofill}>채우기</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(0, 1fr))', gap: 6, marginTop: 16 }}>
+        {Array.from({ length: BOOK_SIZE }, (_, i) => i + 1).map(n => (
+          <label key={n} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--ink3)', fontWeight: 600 }}>{n}번</span>
+            <input
+              className="field"
+              inputMode="numeric"
+              value={pages[n] || ''}
+              onChange={e => {
+                const v = num(e.target.value)
+                setPages(p => {
+                  const x = { ...p }
+                  if (v) x[n] = Math.min(max, v)
+                  else delete x[n]
+                  return x
+                })
+              }}
+              style={{ height: 44, padding: 0, textAlign: 'center', fontWeight: 600 }}
+            />
+          </label>
+        ))}
+      </div>
+
+      <button className="btn primary" style={{ marginTop: 22, height: 64 }} onClick={save} disabled={!scoreId}>
+        저장
+      </button>
+    </Sheet>
+  )
+}

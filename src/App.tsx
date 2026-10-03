@@ -1,0 +1,87 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Icon, type IconName } from './components/Icon'
+import { ToastProvider } from './components/ui'
+import { requestPersist } from './lib/backup'
+import { useSettings, useThemeAttr } from './lib/hooks'
+import { metronome } from './lib/metronome'
+import { NavCtx, type Nav, type Page, type PracticeTarget, type Tab } from './nav'
+import { Basics } from './screens/Basics'
+import { ExerciseDetail } from './screens/ExerciseDetail'
+import { PracticeMode } from './screens/PracticeMode'
+import { PracticeTab } from './screens/PracticeTab'
+import { Records } from './screens/Records'
+import { Repertoire } from './screens/Repertoire'
+import { ScoreScreen } from './screens/ScoreScreen'
+import { SettingsPage } from './screens/Settings'
+import { Today } from './screens/Today'
+
+const TABS: { id: Tab; label: string; icon: IconName }[] = [
+  { id: 'today', label: '오늘', icon: 'today' },
+  { id: 'practice', label: '연습', icon: 'practice' },
+  { id: 'basics', label: '기초', icon: 'basics' },
+  { id: 'repertoire', label: '레퍼토리', icon: 'repertoire' },
+  { id: 'records', label: '기록', icon: 'records' }
+]
+
+export function App() {
+  const settings = useSettings()
+  useThemeAttr(settings.theme)
+  const [tab, setTabState] = useState<Tab>('today')
+  const [page, setPage] = useState<Page | null>(null)
+  const [practice, setPractice] = useState<PracticeTarget | null>(null)
+  const [score, setScore] = useState<{ id: number; page: number } | null>(null)
+
+  useEffect(() => {
+    void requestPersist()
+  }, [])
+
+  const nav = useMemo<Nav>(
+    () => ({
+      tab,
+      setTab: t => {
+        setPage(null)
+        setTabState(t)
+      },
+      page,
+      openPage: setPage,
+      closePage: () => setPage(null),
+      startPractice: t => {
+        metronome.unlock() // iOS: 터치 안에서 오디오 깨우기
+        setPractice(t)
+      },
+      openScore: (id, p = 1) => setScore({ id, page: p })
+    }),
+    [tab, page]
+  )
+
+  let body
+  if (page?.kind === 'detail') body = <ExerciseDetail key={`${page.book}${page.no}`} book={page.book} no={page.no} />
+  else if (page?.kind === 'settings') body = <SettingsPage />
+  else if (tab === 'today') body = <Today />
+  else if (tab === 'practice') body = <PracticeTab />
+  else if (tab === 'basics') body = <Basics />
+  else if (tab === 'repertoire') body = <Repertoire />
+  else body = <Records />
+
+  const activeTab = page?.kind === 'detail' ? 'basics' : page?.kind === 'settings' ? 'today' : tab
+
+  return (
+    <NavCtx.Provider value={nav}>
+      <ToastProvider>
+        <div className="app">
+          {body}
+          <nav className="tabbar">
+            {TABS.map(t => (
+              <button key={t.id} className={activeTab === t.id ? 'on' : ''} onClick={() => nav.setTab(t.id)}>
+                <Icon name={t.icon} size={26} width={1.6} />
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+        {practice && <PracticeMode target={practice} onClose={() => setPractice(null)} />}
+        {score && <ScoreScreen scoreId={score.id} initialPage={score.page} closeLabel="닫기" onClose={() => setScore(null)} />}
+      </ToastProvider>
+    </NavCtx.Provider>
+  )
+}
