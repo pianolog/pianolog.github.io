@@ -1,6 +1,6 @@
 # 피아노 연습 기록
 
-iPad에서 쓰는 피아노 연습 기록 웹앱(PWA)입니다. **https://suncheongwon281-web.github.io/piano-practice/** 기획은 [PLAN.md](PLAN.md), 디자인은 [design/](design/), 사용법은 [USER_MANUAL.md](USER_MANUAL.md)에 있습니다.
+iPad에서 쓰는 피아노 연습 기록 웹앱(PWA)입니다. **https://pianolog.github.io/** 기획은 [PLAN.md](PLAN.md), 디자인은 [design/](design/), 사용법은 [USER_MANUAL.md](USER_MANUAL.md)에 있습니다.
 
 ## 1단계 — 기초 연습
 

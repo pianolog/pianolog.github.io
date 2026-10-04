@@ -99,7 +99,7 @@
 
 ### A. 준비
 
-- 앱 주소: https://suncheongwon281-web.github.io/piano-practice/
+- 앱 주소: https://pianolog.github.io/
 
 ### B. 절차
 
