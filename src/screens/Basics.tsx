@@ -187,7 +187,7 @@ function ScaleBook({ arp }: { arp: boolean }) {
         <span>칸 색 = 최고 클린 BPM · 오른쪽 위 = 다음 복습</span>
       </div>
       {pickKey && <KeySheet onClose={() => setPickKey(false)} />}
-      {circle && <CircleSheet onClose={() => setCircle(false)} />}
+      {circle && <CircleSheet mode={arp ? 'arpeggio' : 'scale'} onClose={() => setCircle(false)} />}
     </>
   )
 }

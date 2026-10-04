@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { Book, Key, ScoreBook } from './data/exercises'
 
-export type Tab = 'today' | 'practice' | 'basics' | 'repertoire' | 'records'
+export type Tab = 'today' | 'basics' | 'repertoire' | 'records'
 
 /** 연습 모드로 들어갈 대상 */
 export type PracticeTarget =

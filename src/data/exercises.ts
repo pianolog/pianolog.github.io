@@ -101,20 +101,33 @@ export function scaleQueue(key: Key) {
 
 // ── 5도권 묶음 ──
 
-/** ms 장조 스케일, ma 장조 아르페지오, ns 단조 스케일, na 단조 아르페지오 */
-export type ScaleKind = 'ms' | 'ma' | 'ns' | 'na'
-export const SCALE_KINDS: { id: ScaleKind; label: string }[] = [
-  { id: 'ms', label: '장조 스케일' },
-  { id: 'ma', label: '장조 아르페지오' },
-  { id: 'ns', label: '단조 스케일' },
-  { id: 'na', label: '단조 아르페지오' }
+/** ms·ns 장조·단조 스케일(하농 39) · ma·na 장조·단조 아르페지오(41) · d7 속7화음(42) · dim 감7화음(43) */
+export type ScaleKind = 'ms' | 'ns' | 'ma' | 'na' | 'd7' | 'dim'
+export type CircleMode = 'scale' | 'arpeggio'
+// 하농처럼 한 조 안에서 장조 다음 관계 단조
+export const SCALE_KINDS: { id: ScaleKind; label: string; mode: CircleMode }[] = [
+  { id: 'ms', label: '장조 스케일', mode: 'scale' },
+  { id: 'ns', label: '단조 스케일', mode: 'scale' },
+  { id: 'ma', label: '장조 아르페지오', mode: 'arpeggio' },
+  { id: 'na', label: '단조 아르페지오', mode: 'arpeggio' },
+  { id: 'd7', label: '속7화음', mode: 'arpeggio' },
+  { id: 'dim', label: '감7화음', mode: 'arpeggio' }
 ]
 
 export interface ScaleSet {
   keys: number[] // 고른 조 (KEYS 위치 0–11)
   start: number // 시작 조
-  dir: 'cw' | 'ccw' // 5도씩(원에서 반시계 방향) / 4도씩(시계 방향)
+  dir: 'cw' | 'ccw' // 5도씩 / 4도씩
   kinds: ScaleKind[]
+}
+
+const KIND_NO: Record<ScaleKind, (k: number) => number> = {
+  ms: k => scaleNo(0, k),
+  ns: k => scaleNo(0, k + 12),
+  ma: k => scaleNo(1, k),
+  na: k => scaleNo(1, k + 12),
+  d7: k => scaleNo(3, k),
+  dim: k => scaleNo(4, k)
 }
 
 /** 시작 조부터 5도권 방향으로 돌며, 조마다 고른 종류를 묶어 차례로 */
@@ -123,10 +136,7 @@ export function circleQueue(set: ScaleSet) {
   for (let i = 0; i < 12; i++) {
     const k = (set.start + (set.dir === 'cw' ? i : -i) + 12) % 12
     if (!set.keys.includes(k)) continue
-    for (const kind of SCALE_KINDS.map(x => x.id)) {
-      if (!set.kinds.includes(kind)) continue
-      out.push(scaleNo(kind === 'ma' || kind === 'na' ? 1 : 0, k + (kind === 'ns' || kind === 'na' ? 12 : 0)))
-    }
+    for (const { id } of SCALE_KINDS) if (set.kinds.includes(id)) out.push(KIND_NO[id](k))
   }
   return out
 }

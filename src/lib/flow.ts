@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Key } from '../data/exercises'
 import type { PracticeTarget } from '../nav'
 import { cardQueue, loadCards, useCards } from './cards'
-import { db, loadSettings, type Card, type Entry, type Settings } from './db'
+import { circleSet, db, loadSettings, type Card, type Entry, type Settings } from './db'
 import { loadRepData, recommendToday, useRepData } from './repertoire'
 import { routineLabel, routineProgress, todayKey, type RoutineCtx, type RoutineProgress } from './stats'
 
@@ -40,7 +40,8 @@ function buildCtx(settings: Settings, entries: Entry[], rep: RepData, cards: Map
     key,
     repQueue: picks.map(p => p.section.id!),
     repDone: picks.filter(p => p.doneToday).map(p => p.section.id!),
-    scaleSet: settings.scaleSet,
+    scaleSet: circleSet(settings, 'scale'),
+    arpSet: circleSet(settings, 'arpeggio'),
     cards: { hanon: cardQueue('hanon', cards, o), pischna: cardQueue('pischna', cards, o), scale: cardQueue('scale', cards, o) }
   }
 }

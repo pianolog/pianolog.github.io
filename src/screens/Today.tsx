@@ -12,6 +12,7 @@ import { useNav } from '../nav'
 import { RoutineEditor } from './RoutineEditor'
 import { KeySheet } from './KeySheet'
 import { SrsBar } from './SrsBar'
+import { FreeStart } from './FreeStart'
 import type { Book } from '../data/exercises'
 
 export function Today() {
@@ -44,7 +45,7 @@ export function Today() {
   const start = () => {
     const t = next && targetFor(next, key)
     if (t) nav.startPractice(t)
-    else nav.setTab('practice')
+    else nav.setTab('basics')
   }
 
   return (
@@ -168,6 +169,8 @@ export function Today() {
             {srsBooks.map(b => <SrsBar key={b} plain book={b} items={ctx.cards[b]} />)}
           </div>
         )}
+
+        <FreeStart />
 
         {lessonOpen.length > 0 && (
           <div className="card">

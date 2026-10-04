@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { KEYS, MINORS, SCALE_KINDS, circleQueue, type ScaleSet } from '../data/exercises'
+import { KEYS, MINORS, SCALE_KINDS, circleQueue, type CircleMode, type ScaleSet } from '../data/exercises'
 import { PlayIcon } from '../components/Icon'
 import { Segmented, Sheet, SheetHead } from '../components/ui'
-import { saveSetting } from '../lib/db'
+import { circleSet, saveSetting } from '../lib/db'
 import { useEntries, useSettings } from '../lib/hooks'
 import { todayKey } from '../lib/stats'
 import { useNav } from '../nav'
@@ -26,13 +26,15 @@ function wedge(r1: number, r2: number, a1: number, a2: number) {
   return `M${x1},${y1} A${r2},${r2} 0 0 1 ${x2},${y2} L${x3},${y3} A${r1},${r1} 0 0 0 ${x4},${y4} Z`
 }
 
-/** 5도권 원에서 조를 골라 스케일·아르페지오를 묶어 연습 */
-export function CircleSheet({ onClose, saveOnly }: { onClose: () => void; saveOnly?: boolean }) {
+/** 5도권 원에서 조를 골라 스케일(하농 39) 또는 아르페지오(하농 41·42·43)를 묶어 연습 */
+export function CircleSheet({ mode, onClose, saveOnly }: { mode: CircleMode; onClose: () => void; saveOnly?: boolean }) {
   const nav = useNav()
   const settings = useSettings()
   const entries = useEntries()
   const today = KEYS.indexOf(todayKey(settings, entries))
-  const [set, setSet] = useState<ScaleSet>(settings.scaleSet)
+  const [set, setSet] = useState<ScaleSet>(() => circleSet(settings, mode))
+  const kinds = SCALE_KINDS.filter(k => k.mode === mode)
+  const name = mode === 'scale' ? '스케일' : '아르페지오'
   const patch = (p: Partial<ScaleSet>) => setSet(s => ({ ...s, ...p }))
 
   const toggle = (k: number) => {
@@ -49,7 +51,7 @@ export function CircleSheet({ onClose, saveOnly }: { onClose: () => void; saveOn
     if (set.keys.includes(k)) order.push(k)
   }
 
-  const save = () => saveSetting('scaleSet', set)
+  const save = () => saveSetting(mode === 'scale' ? 'scaleSet' : 'arpSet', set)
   const start = async () => {
     await save()
     onClose()
@@ -58,7 +60,7 @@ export function CircleSheet({ onClose, saveOnly }: { onClose: () => void; saveOn
 
   return (
     <Sheet onClose={onClose}>
-      <SheetHead title="5도권 묶음" sub="원에서 조를 누르세요. 바깥은 장조, 안쪽은 관계 단조예요." onClose={onClose} />
+      <SheetHead title={`5도권 묶음 · ${name}`} sub={`원에서 조를 누르세요. 바깥은 장조, 안쪽은 관계 단조예요. ${mode === 'scale' ? '하농 39번' : '하농 41·42·43번'} 기준.`} onClose={onClose} />
 
       <div style={{ display: 'flex', gap: 24, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} style={{ flex: 'none', maxWidth: '100%', touchAction: 'manipulation' }}>
@@ -117,7 +119,7 @@ export function CircleSheet({ onClose, saveOnly }: { onClose: () => void; saveOn
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
         <span className="sec-label">조마다 칠 것</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {SCALE_KINDS.map(k => {
+          {kinds.map(k => {
             const on = set.kinds.includes(k.id)
             return (
               <button key={k.id} className={`pick${on ? ' on' : ''}`} onClick={() => patch({ kinds: on ? set.kinds.filter(x => x !== k.id) : [...set.kinds, k.id] })}>

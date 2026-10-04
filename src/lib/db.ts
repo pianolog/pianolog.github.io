@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Book, Hand, Key, ScaleSet } from '../data/exercises'
+import { SCALE_KINDS, type Book, type CircleMode, type Hand, type Key, type ScaleSet } from '../data/exercises'
 import { migrateGrade, migrateSectionSrs, type Rating, type Srs } from './srs'
 
 /** 기록 종류: 기초(하농·피쉬나·스케일) / 자유 / 레퍼토리 구간 / 런스루 */
@@ -43,7 +43,7 @@ export interface RoutineItem {
   id?: number
   order: number
   refType: RoutineType
-  from: number // 하농·피쉬나 시작 번호 · 스케일은 0 = 오늘의 조, 1 = 저장한 5도권 묶음
+  from: number // 하농·피쉬나 시작 번호 · 스케일은 0 = 오늘의 조, 1 = 5도권 묶음(스케일), 2 = 5도권 묶음(아르페지오)
   to: number // 끝 번호 (단일이면 from과 같음)
   title: string // 자유 항목 제목
   minutes: number
@@ -254,7 +254,8 @@ export interface Settings {
   cardNewPerDay: number // 기초: 책마다 하루 새 카드
   maxIvl: number // 최대 간격(일)
   leechAt: number // '다시' 몇 번이면 어려운 곳
-  scaleSet: ScaleSet // 저장한 5도권 묶음
+  scaleSet: ScaleSet // 저장한 5도권 묶음 (스케일)
+  arpSet: ScaleSet // 저장한 5도권 묶음 (아르페지오)
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -274,7 +275,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cardNewPerDay: 3,
   maxIvl: 60,
   leechAt: 6,
-  scaleSet: { keys: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], start: 0, dir: 'cw', kinds: ['ms', 'ma', 'ns', 'na'] }
+  scaleSet: { keys: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], start: 0, dir: 'cw', kinds: ['ms', 'ns'] },
+  arpSet: { keys: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], start: 0, dir: 'cw', kinds: ['ma', 'na'] }
 }
 
 export async function loadSettings(): Promise<Settings> {
@@ -282,6 +284,14 @@ export async function loadSettings(): Promise<Settings> {
   const out = { ...DEFAULT_SETTINGS } as Record<string, unknown>
   for (const r of rows) if (r.key in DEFAULT_SETTINGS) out[r.key] = r.value
   return out as unknown as Settings
+}
+
+/** 스케일·아르페지오 묶음. 예전에 한 묶음에 섞여 저장된 종류는 걸러낸다 */
+export function circleSet(s: Settings, mode: CircleMode): ScaleSet {
+  const set = mode === 'scale' ? s.scaleSet : s.arpSet
+  const allowed = SCALE_KINDS.filter(k => k.mode === mode).map(k => k.id)
+  const kinds = set.kinds.filter(k => allowed.includes(k))
+  return { ...set, kinds: kinds.length ? kinds : DEFAULT_SETTINGS[mode === 'scale' ? 'scaleSet' : 'arpSet'].kinds }
 }
 
 export function saveSetting<K extends keyof Settings>(key: K, value: Settings[K]) {

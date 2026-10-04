@@ -116,14 +116,15 @@ export interface RoutineCtx {
   key: Key // 오늘의 조
   repQueue: number[] // 레퍼토리 오늘 할 구간 id
   repDone: number[] // 그중 오늘 끝낸 구간 ('다시'는 아직 안 끝난 것)
-  scaleSet: ScaleSet // 저장한 5도권 묶음
+  scaleSet: ScaleSet // 저장한 5도권 묶음 (스케일)
+  arpSet: ScaleSet // 저장한 5도권 묶음 (아르페지오)
   cards: Record<Book, CardItem[]> // 기초 간격 복습: 오늘 할 카드
 }
 
 export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
   if (item.refType === 'free') return []
   if (item.srs && item.refType !== 'rep') return ctx.cards[item.refType].map(c => c.no)
-  if (item.refType === 'scale') return item.from === 1 ? circleQueue(ctx.scaleSet) : scaleQueue(ctx.key)
+  if (item.refType === 'scale') return item.from === 1 ? circleQueue(ctx.scaleSet) : item.from === 2 ? circleQueue(ctx.arpSet) : scaleQueue(ctx.key)
   if (item.refType === 'rep') return ctx.repQueue
   return bookItems(item.refType, ctx.splits)
     .filter(it => it.no >= item.from && it.no <= item.to)
@@ -134,7 +135,8 @@ export function routineLabel(item: RoutineItem, key?: Key) {
   if (item.refType === 'free') return item.title
   if (item.refType === 'rep') return '레퍼토리 · 오늘 할 구간'
   if (item.srs) return `${item.refType === 'hanon' ? '하농' : item.refType === 'pischna' ? '피쉬나' : '스케일·아르페지오'} · 간격 복습`
-  if (item.refType === 'scale' && item.from === 1) return '스케일·아르페지오 · 5도권 묶음'
+  if (item.refType === 'scale' && item.from === 1) return '스케일 · 5도권 묶음'
+  if (item.refType === 'scale' && item.from === 2) return '아르페지오 · 5도권 묶음'
   if (item.refType === 'scale') return key ? `스케일·아르페지오 · ${key} / ${relativeMinor(key)}` : '스케일·아르페지오 (오늘의 조)'
   const lab = item.refType === 'pischna' ? pischnaLabel : String
   const range = item.from === item.to ? lab(item.from) : `${lab(item.from)}–${lab(item.to)}`

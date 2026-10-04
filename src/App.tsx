@@ -8,7 +8,6 @@ import { NavCtx, type Nav, type Page, type PracticeTarget, type Tab } from './na
 import { Basics } from './screens/Basics'
 import { ExerciseDetail } from './screens/ExerciseDetail'
 import { PracticeMode } from './screens/PracticeMode'
-import { PracticeTab } from './screens/PracticeTab'
 import { Records } from './screens/Records'
 import { Repertoire } from './screens/Repertoire'
 import { ScoreScreen } from './screens/ScoreScreen'
@@ -21,7 +20,6 @@ import { SectionPractice } from './screens/rep/SectionPractice'
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'today', label: '오늘', icon: 'today' },
-  { id: 'practice', label: '연습', icon: 'practice' },
   { id: 'basics', label: '기초', icon: 'basics' },
   { id: 'repertoire', label: '레퍼토리', icon: 'repertoire' },
   { id: 'records', label: '기록', icon: 'records' }
@@ -71,7 +69,6 @@ export function App() {
   else if (page?.kind === 'piece') body = <PieceDetail key={page.pieceId} pieceId={page.pieceId} />
   else if (page?.kind === 'run') body = <RunReview key={page.runId} runId={page.runId} />
   else if (tab === 'today') body = <Today />
-  else if (tab === 'practice') body = <PracticeTab />
   else if (tab === 'basics') body = <Basics />
   else if (tab === 'repertoire') body = <Repertoire />
   else body = <Records />
