@@ -1,4 +1,4 @@
-import { db, migrateSection } from './db'
+import { db, migrateCircleSets, migrateSection } from './db'
 import { migrateGrade } from './srs'
 import { dateKey } from './time'
 
@@ -59,14 +59,16 @@ export async function importBackup(file: File) {
     for (const s of data.sections ?? []) migrateSection(s)
     await db.routine.bulkAdd(data.routine ?? [])
     for (const t of REP_TABLES) {
-      if (!data[t]) continue
       await db.table(t).clear()
+      if (!data[t]) continue
       // 곡의 악보 연결은 이 기기의 PDF id라서 지운다
       await db.table(t).bulkAdd(t === 'pieces' ? data[t].map((p: { scoreId?: number }) => ({ ...p, scoreId: null })) : data[t])
     }
-    // 악보 연결은 이 기기의 PDF id에 묶여 있어서 가져오지 않는다
-    const settings = (data.settings ?? []).filter((s: { key: string }) => s.key !== 'hanonBook' && s.key !== 'pischnaBook')
-    await db.settings.bulkPut(settings)
+    // 설정은 백업 것으로 바꾸되, 악보 연결(하농·피쉬나 책, 스케일·자유 연습 악보)은 이 기기의 PDF id라서 이 기기 것을 남긴다
+    const deviceKey = (k: string) => k === 'hanonBook' || k === 'pischnaBook' || k.startsWith('score:')
+    await db.settings.filter(s => !deviceKey(s.key)).delete()
+    await db.settings.bulkPut((data.settings ?? []).filter((s: { key: string }) => !deviceKey(s.key)))
+    await migrateCircleSets(db.settings, db.routine)
   })
   return { entries: data.entries?.length ?? 0 }
 }

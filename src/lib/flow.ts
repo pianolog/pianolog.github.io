@@ -8,6 +8,7 @@ import { routineLabel, routineProgress, todayKey, type RoutineCtx, type RoutineP
 
 type RepData = Awaited<ReturnType<typeof loadRepData>>
 import { dateKey } from './time'
+import { scaleTitle } from '../data/exercises'
 
 /** 루틴 항목 → 연습 대상. 칠 번호가 없으면 null */
 export function targetFor(p: RoutineProgress, key: Key): PracticeTarget | null {
@@ -15,19 +16,21 @@ export function targetFor(p: RoutineProgress, key: Key): PracticeTarget | null {
   if (item.refType === 'free') return { refType: 'free', title: item.title, routineId: item.id }
   if (p.pending && item.refType !== 'rep') {
     if (!p.pending.length) return null
-    return { refType: item.refType, queue: p.pending.map(c => c.no), keys: p.pending.map(c => c.key), routineId: item.id }
+    return { refType: item.refType, queue: p.pending.map(c => c.no), keys: p.pending.map(c => c.key), routineId: item.id, label: routineLabel(item, key) }
   }
   if (!nums.length) return null
   const from = p.nextNo ?? nums[0]
   const queue = nums.slice(nums.indexOf(from))
   if (item.refType === 'rep') return { refType: 'section', queue, routineId: item.id }
-  return { refType: item.refType, queue, key: item.refType === 'hanon' ? key : undefined, routineId: item.id }
+  return { refType: item.refType, queue, key: item.refType === 'hanon' ? key : undefined, routineId: item.id, label: routineLabel(item, key) }
 }
 
 export function targetLabel(t: PracticeTarget) {
   if (t.refType === 'free') return t.title
   if (t.refType === 'section') return '레퍼토리 · 오늘 할 구간'
+  if (t.label) return t.label
   if (t.keys) return `${routineLabel({ order: 0, refType: t.refType, from: 0, to: 0, title: '', minutes: 0, srs: true })} ${t.queue.length}개`
+  if (t.refType === 'scale') return t.queue.length > 1 ? `${scaleTitle(t.queue[0])} 외 ${t.queue.length - 1}개` : scaleTitle(t.queue[0])
   return routineLabel({ order: 0, refType: t.refType, from: t.queue[0], to: t.queue[t.queue.length - 1], title: '', minutes: 0 }, t.key)
 }
 

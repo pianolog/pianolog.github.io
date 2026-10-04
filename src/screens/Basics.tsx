@@ -74,7 +74,7 @@ function srsText(c: Srs | undefined) {
 /** 스케일·아르페지오 칸 하나 */
 function ScaleCell({ no, label, sub, stat, today, cards, wide }: { no: number; label: string; sub?: string; stat?: ExerciseStat; today: boolean; cards: Map<string, Card>; wide?: boolean }) {
   const nav = useNav()
-  const stale = stat?.last ? daysAgo(stat.last) >= 14 : false
+  const stale = stat?.last ? daysAgo(stat.last) >= 21 : false
   const c = cards.get(cardId('scale', no))?.srs
   const next = srsText(c)
   return (
@@ -183,7 +183,7 @@ function ScaleBook({ arp }: { arp: boolean }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 2px', fontSize: 13, color: 'var(--ink2)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, border: '2px solid var(--accent)' }} />오늘의 조</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid var(--alert)' }} />14일 이상 안 침</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid var(--alert)' }} />21일 이상 안 침</span>
         <span>칸 색 = 최고 클린 BPM · 오른쪽 위 = 다음 복습</span>
       </div>
       {pickKey && <KeySheet onClose={() => setPickKey(false)} />}
@@ -239,6 +239,9 @@ export function Basics() {
                   <div style={{ marginLeft: 'auto' }}>
                     <Segmented value={mode} onChange={setMode} options={[{ value: 'bpm', label: 'BPM 보기' }, { value: 'cov', label: '조 커버리지' }]} />
                   </div>
+                  <button className="btn primary sm" style={{ height: 48 }} onClick={() => nav.startPractice({ refType: 'hanon', queue: items.map(it => it.no), key })}>
+                    <PlayIcon size={18} /> {key}로 21–30
+                  </button>
                 </>
               ) : (
                 <>

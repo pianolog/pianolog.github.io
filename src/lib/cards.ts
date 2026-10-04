@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CHROMATIC, KEYS, bookItems, scaleNo, scaleQueue, type Book, type Key } from '../data/exercises'
+import { CHROMATIC, KEYS, bookItems, scaleNo, type Book, type Key } from '../data/exercises'
 import { cardId, db, type Card, type Settings } from './db'
 import { againToday, doneToday, isDue, newSrs, schedule, type Rating, type Srs } from './srs'
 import { dateKey } from './time'
@@ -30,23 +30,28 @@ export async function loadCards() {
 /** 오늘의 조부터 5도권을 한 바퀴 */
 const keysFrom = (key: Key) => KEYS.map((_, i) => KEYS[(KEYS.indexOf(key) + i) % 12])
 
-/** 이 책의 모든 카드 (새 카드를 꺼낼 순서) */
-export function bookCards(book: Book, splits: number[], key: Key): { no: number; key?: Key }[] {
-  if (book === 'hanon') return keysFrom(key).flatMap(k => bookItems('hanon', splits).map(it => ({ no: it.no, key: k })))
-  if (book === 'pischna') return bookItems('pischna', splits).map(it => ({ no: it.no }))
-  // 24조 스케일·아르페지오(하농 39·41) 다음에 반음계(40), 속7화음(42), 감7화음(43)
-  const ks = keysFrom(key)
-  return [
-    ...ks.flatMap(k => scaleQueue(k).map(no => ({ no }))),
-    { no: CHROMATIC },
-    ...ks.flatMap(k => [{ no: scaleNo(3, KEYS.indexOf(k)) }, { no: scaleNo(4, KEYS.indexOf(k)) }])
-  ]
+/** 이 책의 모든 카드 (새 카드를 꺼낼 순서). 스케일 책은 [스케일 묶음, 아르페지오 묶음] 두 갈래 */
+export function bookCards(book: Book, splits: number[], key: Key): { no: number; key?: Key }[][] {
+  if (book === 'hanon') return [keysFrom(key).flatMap(k => bookItems('hanon', splits).map(it => ({ no: it.no, key: k })))]
+  if (book === 'pischna') return [bookItems('pischna', splits).map(it => ({ no: it.no }))]
+  const ks = keysFrom(key).map(k => KEYS.indexOf(k))
+  // 스케일: 조마다 장조 → 관계 단조 (하농 39), 반음계(40)는 첫 조 다음에
+  const scales = ks.flatMap(i => [{ no: scaleNo(0, i) }, { no: scaleNo(0, i + 12) }])
+  scales.splice(2, 0, { no: CHROMATIC })
+  // 아르페지오: 조마다 장조 → 단조 (41) → 속7화음 (42) → 감7화음 (43)
+  const arps = ks.flatMap(i => [{ no: scaleNo(1, i) }, { no: scaleNo(1, i + 12) }, { no: scaleNo(3, i) }, { no: scaleNo(4, i) }])
+  return [scales, arps]
 }
 
-/** 오늘 할 카드 (Anki 순서): 오늘 이미 한 것 → 복습(하루 상한) → 새 카드(하루 한도) → 오늘 다시 */
+/**
+ * 오늘 할 카드 (Anki 순서): 오늘 이미 한 것 → 복습(하루 상한) → 새 카드(하루 한도) → 오늘 다시
+ * 한도는 갈래마다 따로 — 스케일과 아르페지오는 각각 하루 한도를 쓴다
+ */
 export function cardQueue(book: Book, cards: Map<string, Card>, o: { splits: number[]; key: Key; settings: Settings; today?: string }): CardItem[] {
-  const today = o.today ?? dateKey()
-  const all = bookCards(book, o.splits, o.key)
+  return bookCards(book, o.splits, o.key).flatMap(group => pickCards(book, group, cards, o.settings, o.today ?? dateKey()))
+}
+
+function pickCards(book: Book, all: { no: number; key?: Key }[], cards: Map<string, Card>, settings: Settings, today: string): CardItem[] {
   const order = new Map(all.map((c, i) => [cardId(book, c.no, c.key), i]))
   const done: CardItem[] = []
   const reviews: CardItem[] = []
@@ -73,8 +78,8 @@ export function cardQueue(book: Book, cards: Map<string, Card>, o: { splits: num
   }
   // 많이 밀린 것부터 고르고, 고른 뒤에는 조끼리 모이게 원래 순서로
   reviews.sort((a, b) => (a.srs!.due < b.srs!.due ? -1 : a.srs!.due > b.srs!.due ? 1 : 0))
-  const pickedReviews = reviews.slice(0, Math.max(0, o.settings.cardReviewMax - reviewsUsed)).sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-  return [...done, ...pickedReviews, ...fresh.slice(0, Math.max(0, o.settings.cardNewPerDay - newUsed)), ...again]
+  const pickedReviews = reviews.slice(0, Math.max(0, settings.cardReviewMax - reviewsUsed)).sort((a, b) => order.get(a.id)! - order.get(b.id)!)
+  return [...done, ...pickedReviews, ...fresh.slice(0, Math.max(0, settings.cardNewPerDay - newUsed)), ...again]
 }
 
 export function cardSrs(cards: Map<string, Card>, book: Book, no: number, key?: Key) {

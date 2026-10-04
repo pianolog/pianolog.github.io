@@ -6,7 +6,7 @@ import { useNav } from '../nav'
 export const BOOK_LABEL: Record<Book, string> = { hanon: '하농', pischna: '피쉬나', scale: '스케일·아르페지오' }
 
 /** 오늘 할 기초 카드 수 + 시작 버튼 */
-export function SrsBar({ book, items, plain }: { book: Book; items: CardItem[]; plain?: boolean }) {
+export function SrsBar({ book, items, plain, label }: { book: Book; items: CardItem[]; plain?: boolean; label?: string }) {
   const nav = useNav()
   const n = countStatus(items)
   const pending = items.filter(c => c.status !== 'done')
@@ -14,7 +14,7 @@ export function SrsBar({ book, items, plain }: { book: Book; items: CardItem[]; 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: plain ? '8px 14px' : '12px 14px 12px 20px', borderRadius: 16, background: plain ? 'transparent' : 'var(--s1)', minHeight: 64 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-        <span style={{ fontSize: 16, fontWeight: 600 }}>{plain ? BOOK_LABEL[book] : '오늘의 간격 복습'}</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{plain ? (label ?? BOOK_LABEL[book]) : '오늘의 간격 복습'}</span>
         <span style={{ fontSize: 13, color: 'var(--ink2)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <span>복습 <b style={{ color: 'var(--accentText)' }}>{n.review}</b></span>
           <span>새 카드 <b>{n.new}</b></span>

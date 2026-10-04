@@ -88,10 +88,10 @@ export function SettingsPage() {
           <Row label="레퍼토리 하루 새 구간" sub="처음 연습하는 구간">
             <Segmented value={s.repNewPerDay} onChange={v => saveSetting('repNewPerDay', v)} options={[0, 1, 2, 3, 5].map(n => ({ value: n, label: `${n}개` }))} />
           </Row>
-          <Row label="기초 하루 복습" sub="하농·피쉬나·스케일 책마다">
+          <Row label="기초 하루 복습" sub="하농·피쉬나·스케일·아르페지오 각각">
             <Segmented value={s.cardReviewMax} onChange={v => saveSetting('cardReviewMax', v)} options={[5, 10, 15, 20].map(n => ({ value: n, label: `${n}개` }))} />
           </Row>
-          <Row label="기초 하루 새 카드" sub="책마다 · 하농은 번호×조가 카드 하나">
+          <Row label="기초 하루 새 카드" sub="하농·피쉬나·스케일·아르페지오 각각 · 하농은 번호×조가 카드 하나">
             <Segmented value={s.cardNewPerDay} onChange={v => saveSetting('cardNewPerDay', v)} options={[0, 1, 2, 3, 5].map(n => ({ value: n, label: `${n}개` }))} />
           </Row>
           <Row label="최대 간격" sub="잘 되는 것도 이 기간 안에는 다시 나와요">

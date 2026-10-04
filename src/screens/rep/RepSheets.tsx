@@ -349,7 +349,7 @@ function SrsPanel({ s, setSrs, reset }: { s: Section; setSrs: (p: Partial<Srs>) 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <span className="sec-label">간격 복습</span>
         <span style={{ fontSize: 15, fontWeight: 600 }}>{STATE_LABEL[c.state]}</span>
-        {c.leech && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--alert)', border: '1px solid var(--alert)', borderRadius: 6, padding: '1px 6px' }}>어려운 구간</span>}
+        {c.leech && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--alert)', border: '1px solid var(--alert)', borderRadius: 6, padding: '1px 6px' }}>어려운 곳</span>}
         <span className="caption" style={{ marginLeft: 'auto' }}>
           다음 {due.text}
           {c.state !== 'new' && ` · 간격 ${ivlLabel(c.ivl)} · 쉬움 정도 ${Math.round(c.ease * 100)}% · 다시 ${c.lapses}번`}

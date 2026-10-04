@@ -5,7 +5,7 @@ export type Tab = 'today' | 'basics' | 'repertoire' | 'records'
 
 /** 연습 모드로 들어갈 대상 */
 export type PracticeTarget =
-  | { refType: Book; queue: number[]; key?: Key; keys?: (Key | undefined)[]; routineId?: number } // keys: 간격 복습 카드마다 조
+  | { refType: Book; queue: number[]; key?: Key; keys?: (Key | undefined)[]; routineId?: number; label?: string } // keys: 간격 복습 카드마다 조 · label: 루틴 항목 이름
   | { refType: 'free'; title: string; routineId?: number }
   | { refType: 'section'; queue: number[]; routineId?: number }
 

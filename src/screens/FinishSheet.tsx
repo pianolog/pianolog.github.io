@@ -72,16 +72,6 @@ export function FinishSheet({
           <BpmStepper label="클린 BPM" hint={`자동 ${initial.cleanBpm}`} value={d.cleanBpm} onChange={cleanBpm => set({ cleanBpm })} accent />
         </div>
 
-        {srsFor && srsOpts && (!needKey || d.key) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-              <span className="sec-label">간격 복습</span>
-              <span style={{ fontSize: 12, color: 'var(--ink3)' }}>{needKey ? `${d.key} major 카드 · ` : ''}숫자는 다음 복습까지의 간격</span>
-            </div>
-            <RatingButtons compact srs={srsFor(d.key)} opts={srsOpts} value={d.grade} onChange={grade => set({ grade: d.grade === grade ? null : grade })} />
-          </div>
-        )}
-
         {(refType === 'hanon' || refType === 'pischna') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
@@ -95,6 +85,16 @@ export function FinishSheet({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {srsFor && srsOpts && (!needKey || d.key) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+              <span className="sec-label">간격 복습</span>
+              <span style={{ fontSize: 12, color: 'var(--ink3)' }}>{needKey ? `${d.key} major 카드 · ` : ''}숫자는 다음 복습까지의 간격</span>
+            </div>
+            <RatingButtons compact srs={srsFor(d.key)} opts={srsOpts} value={d.grade} onChange={grade => set({ grade: d.grade === grade ? null : grade })} />
           </div>
         )}
 

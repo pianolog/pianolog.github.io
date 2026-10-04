@@ -135,8 +135,8 @@ export function routineLabel(item: RoutineItem, key?: Key) {
   if (item.refType === 'free') return item.title
   if (item.refType === 'rep') return '레퍼토리 · 오늘 할 구간'
   if (item.srs) return `${item.refType === 'hanon' ? '하농' : item.refType === 'pischna' ? '피쉬나' : '스케일·아르페지오'} · 간격 복습`
-  if (item.refType === 'scale' && item.from === 1) return '스케일 · 5도권 묶음'
-  if (item.refType === 'scale' && item.from === 2) return '아르페지오 · 5도권 묶음'
+  if (item.refType === 'scale' && item.from === 1) return '5도권 스케일'
+  if (item.refType === 'scale' && item.from === 2) return '5도권 아르페지오'
   if (item.refType === 'scale') return key ? `스케일·아르페지오 · ${key} / ${relativeMinor(key)}` : '스케일·아르페지오 (오늘의 조)'
   const lab = item.refType === 'pischna' ? pischnaLabel : String
   const range = item.from === item.to ? lab(item.from) : `${lab(item.from)}–${lab(item.to)}`

@@ -13,7 +13,7 @@ import { RoutineEditor } from './RoutineEditor'
 import { KeySheet } from './KeySheet'
 import { SrsBar } from './SrsBar'
 import { FreeStart } from './FreeStart'
-import type { Book } from '../data/exercises'
+import { isArpeggio, type Book } from '../data/exercises'
 
 export function Today() {
   const nav = useNav()
@@ -166,7 +166,14 @@ export function Today() {
             <div className="card-head" style={{ padding: '0 12px' }}>
               <span className="t">기초 간격 복습<span className="sub">하루 한도 · 설정에서 바꿔요</span></span>
             </div>
-            {srsBooks.map(b => <SrsBar key={b} plain book={b} items={ctx.cards[b]} />)}
+            {srsBooks.flatMap(b =>
+              b === 'scale'
+                ? [
+                    <SrsBar key="scale" plain book="scale" label="스케일" items={ctx.cards.scale.filter(c => !isArpeggio(c.no))} />,
+                    <SrsBar key="arpeggio" plain book="scale" label="아르페지오" items={ctx.cards.scale.filter(c => isArpeggio(c.no))} />
+                  ]
+                : [<SrsBar key={b} plain book={b} items={ctx.cards[b]} />]
+            )}
           </div>
         )}
 

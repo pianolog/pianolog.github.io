@@ -218,6 +218,25 @@ db.version(3)
     })
   })
 
+// 4: 5도권 묶음을 스케일·아르페지오로 나눔 — 옛 묶음에 섞인 아르페지오 종류를 arpSet으로 옮긴다
+db.version(4)
+  .stores({})
+  .upgrade(tx => migrateCircleSets(tx.table('settings'), tx.table('routine')))
+
+/** 옛 5도권 묶음(scaleSet 하나에 스케일·아르페지오 섞임)을 둘로 나눈다. 백업 복원 뒤에도 부른다 */
+export async function migrateCircleSets(settings: Dexie.Table, routine: Dexie.Table) {
+  const row = (await settings.get('scaleSet')) as Setting | undefined
+  if (!row || (await settings.get('arpSet'))) return
+  const old = row.value as ScaleSet
+  const arpKinds = old.kinds.filter(k => k === 'ma' || k === 'na')
+  const scaleKinds = old.kinds.filter(k => k === 'ms' || k === 'ns')
+  if (!arpKinds.length) return
+  await settings.put({ key: 'arpSet', value: { ...old, kinds: arpKinds } })
+  await settings.put({ key: 'scaleSet', value: { ...old, kinds: scaleKinds.length ? scaleKinds : ['ms', 'ns'] } })
+  // 아르페지오만 들어 있던 묶음을 쓰던 루틴 항목은 5도권 아르페지오로
+  if (!scaleKinds.length) await routine.filter((r: RoutineItem) => r.refType === 'scale' && r.from === 1 && !r.srs).modify({ from: 2 })
+}
+
 /** 옛 구간(백업 포함)을 새 형식으로 */
 export function migrateSection(s: Record<string, unknown>) {
   if (!s.srs) s.srs = migrateSectionSrs(s)

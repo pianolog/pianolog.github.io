@@ -20,7 +20,8 @@ export type Hand = (typeof HANDS)[number]
 export const VARIATIONS = ['레가토', '스타카토', '부점', '역부점', '셋잇단', '악센트 이동'] as const
 const SCALE_VARIATIONS = ['평행', '반진행', '3도', '6도', '10도', '부점', '스타카토']
 const MINOR_FORMS = ['화성 단음계', '가락 단음계']
-const ARPEGGIO_VARIATIONS = ['기본 위치', '1전위', '2전위', '속7화음', '감7화음', '부점']
+// 속7화음·감7화음은 하농 42·43번으로 따로 친다
+const ARPEGGIO_VARIATIONS = ['기본 위치', '1전위', '2전위', '부점']
 
 // ── 하농·피쉬나 번호 ──
 
@@ -143,7 +144,6 @@ export function circleQueue(set: ScaleSet) {
 
 export function variationsFor(book: Book | 'free', no: number): readonly string[] {
   if (book !== 'scale') return VARIATIONS
-  if (scaleKind(no) >= 3) return ARPEGGIO_VARIATIONS.filter(v => v !== '속7화음' && v !== '감7화음')
   if (isArpeggio(no)) return ARPEGGIO_VARIATIONS
   return isMinor(no) ? [...MINOR_FORMS, ...SCALE_VARIATIONS] : SCALE_VARIATIONS
 }
