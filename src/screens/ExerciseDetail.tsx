@@ -63,7 +63,7 @@ export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
   const page = map.pages[no]
   const cards = useCards()
   const own = book === 'pischna' ? cards.get(cardId('pischna', no)) : undefined
-  const sub = [book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음', own && srsText(own.srs) && `다음 복습 ${srsText(own.srs)}`, own?.srs.leech && '고질'].filter(Boolean).join(' · ')
+  const sub = [book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음', own && srsText(own.srs) && `다음 복습 ${srsText(own.srs)}`, own?.srs.leech && '어려운 곳'].filter(Boolean).join(' · ')
 
   const openScore = () => {
     if (!map.scoreId) return toast(`설정에서 ${BOOK_NAME[book]} 악보 PDF를 연결하세요`)

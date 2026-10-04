@@ -129,7 +129,7 @@ export function PieceDetail({ pieceId }: { pieceId: number }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span className="serif" style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</span>
-                    {s.srs.leech && <span style={{ ...TAG_STYLE.weak, fontSize: 11, padding: '1px 6px' }}>고질</span>}
+                    {s.srs.leech && <span style={{ ...TAG_STYLE.weak, fontSize: 11, padding: '1px 6px' }}>어려운 곳</span>}
                     {s.weak && <span style={{ ...TAG_STYLE.weak, fontSize: 11, padding: '1px 6px' }}>취약</span>}
                     {nLesson > 0 && <span style={{ ...TAG_STYLE.lesson, fontSize: 11, padding: '1px 6px' }}>레슨 {nLesson}</span>}
                   </div>

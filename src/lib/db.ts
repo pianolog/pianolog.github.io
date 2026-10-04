@@ -237,7 +237,7 @@ export interface Settings {
   cardReviewMax: number // 기초: 책마다 하루 복습 상한
   cardNewPerDay: number // 기초: 책마다 하루 새 카드
   maxIvl: number // 최대 간격(일)
-  leechAt: number // '다시' 몇 번이면 고질
+  leechAt: number // '다시' 몇 번이면 어려운 곳
   scaleSet: ScaleSet // 저장한 5도권 묶음
 }
 

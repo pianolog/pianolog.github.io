@@ -28,7 +28,7 @@ export function RatingButtons({ srs, opts, value, onChange, compact }: { srs: Sr
       </div>
       {value === 'again' && becomesLeech && (
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--alert)', padding: '0 4px' }}>
-          이번까지 '다시' {opts.leechAt}번 — 고질로 표시돼요. 템포를 낮추거나 더 잘게 나눠 보세요.
+          이번까지 '다시' {opts.leechAt}번 — 어려운 곳으로 표시돼요. 템포를 낮추거나 더 잘게 나눠 보세요.
         </span>
       )}
     </div>

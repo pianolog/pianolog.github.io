@@ -17,13 +17,13 @@ export interface Srs {
   lastRating?: Rating
   againOn?: string // 이 날 '다시'를 눌러서 그날 한 번 더 할 것
   introduced?: string // 처음 평가한 날 (새 항목 하루 한도에 씀)
-  leech?: boolean // 고질 구간
+  leech?: boolean // 어려운 곳 (Anki의 leech)
   suspended?: boolean // 잠시 쉬기
 }
 
 export interface SrsOpts {
   maxIvl: number // 최대 간격(일)
-  leechAt: number // 고질로 표시할 '다시' 횟수
+  leechAt: number // 어려운 곳으로 표시할 '다시' 횟수
   cap?: number // D-day 때문에 줄인 최대 간격
 }
 

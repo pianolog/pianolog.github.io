@@ -97,7 +97,7 @@ export function SettingsPage() {
           <Row label="최대 간격" sub="잘 되는 것도 이 기간 안에는 다시 나와요">
             <Segmented value={s.maxIvl} onChange={v => saveSetting('maxIvl', v)} options={[30, 60, 90, 180].map(n => ({ value: n, label: `${n}일` }))} />
           </Row>
-          <Row label="고질 기준" sub="복습 중 '다시'를 이만큼 누르면 고질로 표시">
+          <Row label="어려운 곳 기준" sub="복습 중 '다시'를 이만큼 누르면 어려운 곳으로 표시">
             <Segmented value={s.leechAt} onChange={v => saveSetting('leechAt', v)} options={[4, 6, 8].map(n => ({ value: n, label: `${n}번` }))} />
           </Row>
         </div>

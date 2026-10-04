@@ -139,7 +139,7 @@ export function recommend(
     let score = 0
     if (isNew) tags.push({ text: '새 구간', kind: 'plain' })
     if (isAgain) tags.push({ text: '오늘 다시', kind: 'over' })
-    if (c.leech) tags.push({ text: '고질', kind: 'weak' })
+    if (c.leech) tags.push({ text: '어려운 곳', kind: 'weak' })
     if (s.weak) {
       score += 4
       tags.push({ text: '취약', kind: 'weak' })

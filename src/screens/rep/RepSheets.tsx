@@ -256,7 +256,7 @@ function SrsPanel({ s, setSrs, reset }: { s: Section; setSrs: (p: Partial<Srs>) 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <span className="sec-label">간격 복습</span>
         <span style={{ fontSize: 15, fontWeight: 600 }}>{STATE_LABEL[c.state]}</span>
-        {c.leech && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--alert)', border: '1px solid var(--alert)', borderRadius: 6, padding: '1px 6px' }}>고질 구간</span>}
+        {c.leech && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--alert)', border: '1px solid var(--alert)', borderRadius: 6, padding: '1px 6px' }}>어려운 구간</span>}
         <span className="caption" style={{ marginLeft: 'auto' }}>
           다음 {due.text}
           {c.state !== 'new' && ` · 간격 ${ivlLabel(c.ivl)} · 쉬움 정도 ${Math.round(c.ease * 100)}% · 다시 ${c.lapses}번`}
@@ -265,7 +265,7 @@ function SrsPanel({ s, setSrs, reset }: { s: Section; setSrs: (p: Partial<Srs>) 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="pick" onClick={stop(() => setSrs({ due: dateKey(), suspended: false }))}>오늘 복습으로</button>
         <button className={`pick${c.suspended ? ' on' : ''}`} onClick={stop(() => setSrs({ suspended: !c.suspended }))}>{c.suspended ? '✓ 잠시 쉬는 중' : '잠시 쉬기'}</button>
-        {c.leech && <button className="pick" onClick={stop(() => setSrs({ leech: false, lapses: 0 }))}>고질 해제</button>}
+        {c.leech && <button className="pick" onClick={stop(() => setSrs({ leech: false, lapses: 0 }))}>어려운 곳 해제</button>}
         {c.state !== 'new' && <button className="pick" style={{ color: 'var(--ink3)' }} onClick={stop(() => window.confirm('복습 기록을 지우고 새 구간으로 돌릴까요?') && reset())}>처음부터 다시</button>}
       </div>
       {c.leech && <span className="caption">'다시'가 {c.lapses}번 쌓였어요. 사다리 시작 BPM을 낮추거나, 구간을 더 잘게 나누거나, 레슨에서 물어보세요.</span>}

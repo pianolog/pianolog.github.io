@@ -22,7 +22,7 @@ function countStates(list: Srs[]) {
   return n
 }
 
-/** 기록 → 복습: 앞으로 30일 예정, 기억률, 상태별 개수, 고질 목록 */
+/** 기록 → 복습: 앞으로 30일 예정, 기억률, 상태별 개수, 어려운 곳 목록 */
 export function ReviewStats() {
   const nav = useNav()
   const rep = useRepData()
@@ -124,12 +124,12 @@ export function ReviewStats() {
                 [newLabel, n.new],
                 ['익히는 중', n.learning],
                 ['복습 중', n.review],
-                ['고질', n.leech],
+                ['어려운 곳', n.leech],
                 ['쉬는 중', n.suspended]
               ] as const
             ).map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: '1px solid var(--line)', fontSize: 15 }}>
-                <span style={{ color: l === '고질' && v ? 'var(--alert)' : 'var(--ink2)' }}>{l}</span>
+                <span style={{ color: l === '어려운 곳' && v ? 'var(--alert)' : 'var(--ink2)' }}>{l}</span>
                 <span style={{ fontWeight: 600 }}>{v}</span>
               </div>
             ))}
@@ -163,7 +163,7 @@ export function ReviewStats() {
 
       <div className="card">
         <div className="card-head">
-          <span className="t">고질<span className="sub">'다시'가 자꾸 나오는 것 · 방법을 바꿔 볼 곳</span></span>
+          <span className="t">어려운 곳<span className="sub">'다시'가 자꾸 나오는 것 · 방법을 바꿔 볼 곳</span></span>
         </div>
         {leechSecs.length + leechCards.length === 0 && <div className="empty" style={{ padding: 12 }}>아직 없어요.</div>}
         {leechSecs.map(s => (
