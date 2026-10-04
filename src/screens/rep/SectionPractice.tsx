@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Icon, PauseIcon, PlayIcon } from '../../components/Icon'
 import { Sheet, SheetHead, useToast } from '../../components/ui'
-import { db, type Lesson, type Section } from '../../lib/db'
+import { db, type Attempt, type HandKey, type Lesson, type Section } from '../../lib/db'
 import { nextRoutineTarget } from '../../lib/flow'
 import { useNow, useSettings, useWakeLock } from '../../lib/hooks'
 import { metronome, useMetronome } from '../../lib/metronome'
-import { openLessons, scheduleAfter, sectionOpts, STAGES } from '../../lib/repertoire'
+import { HAND_KEYS, HAND_LABEL, PRACTICE_WAYS, mergeReach, openLessons, parseMeasures, scheduleAfter, sectionOpts, spanText, STAGES, summarizeAttempts } from '../../lib/repertoire'
 import { RATING_LABEL, ivlLabel, type Rating, type SrsOpts } from '../../lib/srs'
 import { clock, dateKey, parseDateKey } from '../../lib/time'
 import { RatingButtons } from '../../components/Rating'
@@ -37,9 +37,15 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
   const [pausedAt, setPausedAt] = useState<number | null>(null)
   const [streak, setStreak] = useState(0)
   const [misses, setMisses] = useState(0)
-  const [tries, setTries] = useState(0)
-  const [oks, setOks] = useState(0)
   const [reached, setReached] = useState(0)
+  // 한 번 칠 때마다 손·마디·방법을 남긴다
+  const [log, setLog] = useState<Attempt[]>([])
+  const [hand, setHand] = useState<HandKey>('B')
+  const [span, setSpan] = useState<{ a: number; b: number } | null>(null) // null = 구간 전체
+  const [pickFrom, setPickFrom] = useState<number | null>(null)
+  const [ways, setWays] = useState<string[]>([])
+  const bpmByHand = useRef<Partial<Record<HandKey, number>>>({})
+  const [bothBpm, setBothBpm] = useState(0) // 양손으로 친 템포 — 구간 BPM으로 저장
   const [flash, setFlash] = useState('')
   const [finishing, setFinishing] = useState(false)
   const [showScore, setShowScore] = useState(false)
@@ -75,11 +81,20 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     setPausedAt(null)
     setStreak(0)
     setMisses(0)
-    setTries(0)
-    setOks(0)
     setReached(section.bpm)
     setFlash('')
+    setLog([])
+    setHand('B')
+    setSpan(null)
+    setPickFrom(null)
+    setWays([])
+    bpmByHand.current = {}
+    setBothBpm(section.bpm)
   }, [section, idx])
+
+  useEffect(() => {
+    if (hand === 'B') setBothBpm(m.bpm)
+  }, [hand, m.bpm])
 
   const steps = useMemo(() => {
     if (!section) return []
@@ -93,13 +108,51 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
   if (!section || !piece) return <div className="full" />
 
   const goal = section.streakGoal || 3
+  const whole = parseMeasures(section.label)
+  const cur = span ?? whole
+  const tries = log.length
+  const oks = log.filter(x => x.ok).length
+  const mine = log.filter(x => x.h === hand && (!cur || (x.a === cur.a && x.b === cur.b)))
+  const record = (ok: boolean) => setLog(l => [...l, { h: hand, a: cur?.a ?? 0, b: cur?.b ?? 0, ok, bpm: m.bpm, w: ways.length ? ways : undefined }])
+
+  // 손이나 범위를 바꾸면 연속 성공은 처음부터, 템포는 그 손으로 마지막에 친 템포로
+  const changeHand = (h: HandKey) => {
+    if (h === hand) return
+    bpmByHand.current[hand] = m.bpm
+    const prev = bpmByHand.current[h] ?? (h === 'B' ? bothBpm : undefined)
+    if (prev) metronome.setBpm(prev)
+    setHand(h)
+    setStreak(0)
+    setMisses(0)
+  }
+  const tapMeasure = (n: number) => {
+    setStreak(0)
+    if (pickFrom === null) {
+      setPickFrom(n)
+      setSpan({ a: n, b: n })
+    } else {
+      setSpan({ a: Math.min(pickFrom, n), b: Math.max(pickFrom, n) })
+      setPickFrom(null)
+    }
+  }
+  const undo = () => {
+    setLog(l => l.slice(0, -1))
+    setStreak(x => Math.max(0, x - 1))
+    setFlash('')
+  }
+  // 이 손으로 통과한 마디: 이전 진도 + 오늘 성공
+  const passed = new Set<number>()
+  if (whole) {
+    const r = mergeReach(whole.a, whole.b, section.reach?.[hand], [])
+    if (r) for (let n = whole.a; n <= r; n++) passed.add(n)
+    for (const x of log) if (x.ok && x.h === hand && x.a) for (let n = x.a; n <= x.b; n++) passed.add(n)
+  }
   const lessonsOpen = openLessons(data!.lessons, section.id!)
   const nextStep = steps.find(v => v > m.bpm)
   const prevStep = [...steps].reverse().find(v => v < m.bpm)
 
   const hit = () => {
-    setTries(t => t + 1)
-    setOks(o => o + 1)
+    record(true)
     setMisses(0)
     const n = streak + 1
     if (n >= goal) {
@@ -115,7 +168,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     }
   }
   const miss = () => {
-    setTries(t => t + 1)
+    record(false)
     setStreak(0)
     setMisses(x => x + 1)
     setFlash('')
@@ -142,18 +195,25 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
       title: `${piece.title} ${section.label}`,
       seconds: Math.round(Math.max(1, itemSec)),
       bpm: Math.max(reached, m.bpm),
-      cleanBpm: m.bpm,
-      hands: '양손',
-      variations: [],
+      cleanBpm: Math.max(0, ...log.filter(x => x.ok && x.h === 'B').map(x => x.bpm)) || bothBpm,
+      hands: HAND_LABEL[mainHand(log)],
+      variations: [...new Set(log.flatMap(x => x.w ?? []))],
       rating: 0,
       memo: memo.trim(),
       attempts: tries,
       successes: oks,
+      attemptLog: log.length ? log : undefined,
       grade,
       srsKind: section.srs.state === 'new' ? 'new' : section.srs.state === 'review' ? 'review' : 'learn'
     })
     const sched = scheduleAfter(section, grade, opts)
-    await db.sections.update(section.id!, { bpm: Math.min(m.bpm, section.targetBpm), ...sched })
+    const reach = { ...section.reach }
+    if (whole)
+      for (const h of HAND_KEYS) {
+        const r = mergeReach(whole.a, whole.b, reach[h], log.filter(x => x.ok && x.h === h && x.a))
+        if (r) reach[h] = r
+      }
+    await db.sections.update(section.id!, { bpm: Math.min(bothBpm || section.bpm, section.targetBpm), reach, ...sched })
     await db.sessions.update(sessionId, { endedAt: Date.now() })
     setFinishing(false)
     metronome.stop()
@@ -163,7 +223,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
       label: '되돌리기',
       run: () => {
         void db.entries.delete(entryId as number)
-        void db.sections.update(prev.id!, { bpm: prev.bpm, srs: prev.srs, weak: prev.weak })
+        void db.sections.update(prev.id!, { bpm: prev.bpm, srs: prev.srs, weak: prev.weak, reach: prev.reach })
         if (grade === 'again') setQueue(x => x.slice(0, -1))
       }
     })
@@ -239,7 +299,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
               )
             })}
           </div>
-          <div style={{ fontSize: 'min(200px, 18vh)', fontWeight: 300, lineHeight: 0.95, letterSpacing: '-0.04em' }}>{m.bpm}</div>
+          <div style={{ fontSize: 'min(170px, 14vh)', fontWeight: 300, lineHeight: 0.95, letterSpacing: '-0.04em' }}>{m.bpm}</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--ink2)' }}>{m.beats}/4 · 목표 {section.targetBpm}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
             <button className="btn icon s1" style={{ fontSize: 24, fontWeight: 500 }} onClick={() => metronome.nudge(-1)}>−</button>
@@ -251,6 +311,70 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
               <span style={{ color: 'var(--ink3)', fontWeight: 500 }}>박자</span>{m.beats}/4
             </button>
           </div>
+        </div>
+
+        <div style={{ background: 'var(--s1)', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            {HAND_KEYS.map(h => {
+              const on = hand === h
+              const n = log.filter(x => x.h === h).length
+              return (
+                <button
+                  key={h}
+                  className="tap"
+                  onClick={() => changeHand(h)}
+                  style={{ height: 52, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 17, fontWeight: 700, whiteSpace: 'nowrap', background: on ? 'var(--ink)' : 'var(--bg)', color: on ? 'var(--bg)' : 'var(--ink2)' }}
+                >
+                  {HAND_LABEL[h]}
+                  <span style={{ minWidth: 26, height: 26, borderRadius: 13, padding: '0 7px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, background: n ? 'var(--accent)' : 'transparent', color: n ? 'var(--accentInk)' : on ? 'var(--bg)' : 'var(--ink3)', opacity: n ? 1 : 0.6 }}>{n}</span>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span className="sec-label" style={{ marginRight: 4 }}>방법</span>
+            {PRACTICE_WAYS.map(w => {
+              const on = ways.includes(w)
+              return (
+                <button key={w} className={`pick${on ? ' on' : ''}`} style={{ height: 40, padding: '0 14px', fontSize: 14 }} onClick={() => setWays(x => (on ? x.filter(v => v !== w) : [...x, w]))}>
+                  {w}
+                </button>
+              )
+            })}
+            <span className="caption" style={{ marginLeft: 'auto' }}>켜 둔 방법이 칠 때마다 함께 기록돼요</span>
+          </div>
+          {whole && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span className="sec-label">마디</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                  {cur ? spanText(cur.a, cur.b) : ''}
+                  {!span && ' (전체)'}
+                </span>
+                <span className="caption">{pickFrom !== null ? '끝 마디를 누르세요' : '시작 → 끝 마디를 누르면 범위를 좁혀요 · 초록 줄 = 통과'}</span>
+                {span && (
+                  <button className="link" style={{ marginLeft: 'auto', fontSize: 14 }} onClick={() => { setSpan(null); setPickFrom(null); setStreak(0) }}>
+                    전체로
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {Array.from({ length: whole.b - whole.a + 1 }, (_, i) => whole.a + i).map(n => {
+                  const inSpan = !!span && n >= span.a && n <= span.b
+                  return (
+                    <button
+                      key={n}
+                      onClick={() => tapMeasure(n)}
+                      style={{ flex: '1 0 40px', maxWidth: 64, height: 40, borderRadius: 8, fontSize: 14, fontWeight: 600, position: 'relative', background: inSpan ? 'color-mix(in oklch, var(--accent) 35%, var(--s1))' : 'var(--bg)', border: n === pickFrom ? '2px solid var(--accent)' : '2px solid transparent', color: inSpan ? 'var(--ink)' : 'var(--ink2)' }}
+                    >
+                      {n}
+                      {passed.has(n) && <span style={{ position: 'absolute', left: 6, right: 6, bottom: 3, height: 3, borderRadius: 2, background: 'var(--ok)' }} />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 22 }}>
@@ -267,7 +391,20 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
               실수가 계속돼요 · {prevStep}로 한 칸 내리기
             </button>
           ) : (
-            <span style={{ fontSize: 14, color: 'var(--ink3)' }}>시도 {tries} · 성공 {oks} · 성공률 {rate}%</span>
+            <span style={{ fontSize: 14, color: 'var(--ink3)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>
+                <b style={{ color: 'var(--ink)', fontSize: 16 }}>
+                  {HAND_LABEL[hand]}
+                  {cur ? ` ${spanText(cur.a, cur.b)}` : ''} {mine.length}번
+                </b>{' '}
+                · 성공 {mine.filter(x => x.ok).length} · 오늘 전체 {tries}번 · 성공률 {rate}%
+              </span>
+              {tries > 0 && (
+                <button className="link" style={{ fontSize: 14 }} onClick={undo}>
+                  방금 것 취소
+                </button>
+              )}
+            </span>
           )}
         </div>
 
@@ -289,6 +426,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
           section={section}
           pieceTitle={piece.title}
           stats={{ tries, rate, reached: Math.max(reached, m.bpm), start: section.bpm, seconds: itemSec }}
+          log={log}
           queueText={queue.length > 1 ? `오늘 구간 ${idx + 1} / ${queue.length}` : ''}
           opts={opts}
           lessons={lessonsOpen}
@@ -308,6 +446,7 @@ function SectionFinishSheet({
   pieceTitle,
   stats,
   queueText,
+  log,
   opts,
   lessons,
   onResolve,
@@ -319,6 +458,7 @@ function SectionFinishSheet({
   pieceTitle: string
   stats: { tries: number; rate: number; reached: number; start: number; seconds: number }
   queueText: string
+  log: Attempt[]
   opts: SrsOpts
   lessons: ReturnType<typeof openLessons>
   onResolve: (l: Lesson, id: string) => void
@@ -344,6 +484,8 @@ function SectionFinishSheet({
         </div>
         <div style={tile}><span className="label" style={{ fontSize: 13 }}>시간</span><span style={{ fontSize: 30, fontWeight: 600, lineHeight: 1 }}>{clock(stats.seconds)}</span></div>
       </div>
+
+      {log.length > 0 && <AttemptSummary section={section} log={log} />}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginTop: 28 }}>
         <span className="sec-label">오늘 이 구간은</span>
@@ -377,5 +519,43 @@ function SectionFinishSheet({
         </button>
       </div>
     </Sheet>
+  )
+}
+
+/** 가장 많이 친 손 (양손을 한 번이라도 쳤으면 양손) */
+function mainHand(log: Attempt[]): HandKey {
+  if (!log.length || log.some(x => x.h === 'B')) return 'B'
+  return log.filter(x => x.h === 'R').length >= log.filter(x => x.h === 'L').length ? 'R' : 'L'
+}
+
+/** 구간 끝내기: 손마다 친 횟수·마디, 방법, 처음부터 이어서 통과한 마디 */
+function AttemptSummary({ section, log }: { section: Section; log: Attempt[] }) {
+  const whole = parseMeasures(section.label)
+  const ways = new Map<string, number>()
+  for (const x of log) for (const w of x.w ?? []) ways.set(w, (ways.get(w) ?? 0) + 1)
+  return (
+    <div style={{ marginTop: 14, background: 'var(--bg)', borderRadius: 16, padding: '6px 18px 10px', display: 'flex', flexDirection: 'column' }}>
+      {summarizeAttempts(log).map(x => {
+        const before = section.reach?.[x.h]
+        const after = whole ? mergeReach(whole.a, whole.b, before, log.filter(l => l.ok && l.h === x.h && l.a)) : undefined
+        return (
+          <div key={x.h} style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 12, alignItems: 'baseline', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+            <span style={{ fontWeight: 700 }}>{HAND_LABEL[x.h]}</span>
+            <span style={{ fontSize: 14, color: 'var(--ink2)' }}>
+              {x.spans.join(', ')}
+              {whole && after && (
+                <span style={{ marginLeft: 8, color: after !== before ? 'var(--ok)' : 'var(--ink3)', fontWeight: after !== before ? 600 : 400 }}>
+                  {after >= whole.b ? '끝까지 통과' : `m.${after}까지 통과`}
+                </span>
+              )}
+            </span>
+            <span style={{ fontSize: 15 }}>
+              <b>{x.n}번</b> <span style={{ color: 'var(--ink3)' }}>· 성공 {x.ok}</span>
+            </span>
+          </div>
+        )
+      })}
+      {ways.size > 0 && <span style={{ fontSize: 14, color: 'var(--ink2)', paddingTop: 8 }}>{[...ways].map(([w, n]) => `${w} ${n}번`).join(' · ')}</span>}
+    </div>
   )
 }

@@ -7,7 +7,7 @@ import { RATING_LABEL } from '../lib/srs'
 import { db } from '../lib/db'
 import { useEntries } from '../lib/hooks'
 import { secondsByDay } from '../lib/stats'
-import { entryTitle } from '../lib/repertoire'
+import { attemptLine, entryTitle } from '../lib/repertoire'
 import { addDays, clock, dateKey, duration, parseDateKey, shortDate } from '../lib/time'
 
 const WEEKS = 53
@@ -119,7 +119,7 @@ export function Records() {
                   {e.key && <span className="serif" style={{ marginLeft: 8, color: 'var(--ink2)' }}>{e.key}</span>}
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {[`클린 ${e.cleanBpm} · 도달 ${e.bpm}`, e.hands, ...e.variations, e.rating ? '★'.repeat(e.rating) : '', e.grade ? RATING_LABEL[e.grade] : '', e.memo].filter(Boolean).join(' · ')}
+                  {[`클린 ${e.cleanBpm} · 도달 ${e.bpm}`, ...(e.attemptLog ? [attemptLine(e.attemptLog)] : [e.hands, ...e.variations]), e.rating ? '★'.repeat(e.rating) : '', e.grade ? RATING_LABEL[e.grade] : '', e.memo].filter(Boolean).join(' · ')}
                 </span>
               </div>
               <span style={{ color: 'var(--ink2)' }}>{clock(e.seconds)}</span>

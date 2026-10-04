@@ -35,6 +35,7 @@ export interface Entry {
   attempts?: number
   successes?: number
   grade?: Rating // 간격 복습 평가 (구간·기초)
+  attemptLog?: Attempt[] // 구간 연습: 한 번 칠 때마다 (손·마디·성공)
   srsKind?: 'new' | 'learn' | 'review' // 평가할 때의 상태 — 기억률 계산에 씀
 }
 
@@ -79,6 +80,19 @@ export interface Piece {
   scoreId?: number | null
 }
 
+/** 구간 연습에서 친 손: 양손 / 오른손 / 왼손 */
+export type HandKey = 'B' | 'R' | 'L'
+
+/** 구간을 한 번 친 기록 */
+export interface Attempt {
+  h: HandKey
+  a: number // 시작 마디 (구간 이름에서 마디를 못 읽으면 0)
+  b: number // 끝 마디
+  ok: boolean
+  bpm: number
+  w?: string[] // 연습 방법 (암보, 리듬 변형 …)
+}
+
 /** 구간 단계: 악보 읽기 → 운지 확정 → 느린 템포 → 템포 업 → 암보 → 연주 완성 */
 
 export interface Section {
@@ -95,6 +109,7 @@ export interface Section {
   weak: boolean
   page?: number // 악보 PDF 페이지
   srs: Srs // 간격 복습
+  reach?: Partial<Record<HandKey, number>> // 손마다 구간 처음부터 이어서 성공한 마지막 마디
 }
 
 /** 기초 카드: 하농 번호×조 / 피쉬나 번호 / 스케일·아르페지오 조 */

@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Icon, PlayIcon } from '../../components/Icon'
 import { useToast } from '../../components/ui'
 import { db, type Section } from '../../lib/db'
-import { ddayLabel, openLessons, recommend, sectionDue, STAGES, useRepData, type Tag } from '../../lib/repertoire'
+import { ddayLabel, openLessons, reachText, recommend, sectionDue, STAGES, useRepData, type Tag } from '../../lib/repertoire'
 import { clock, dateKey, parseDateKey, shortDate } from '../../lib/time'
 import { useNav } from '../../nav'
 import { ScorePicker } from '../ScorePicker'
@@ -133,7 +133,7 @@ export function PieceDetail({ pieceId }: { pieceId: number }) {
                     {s.weak && <span style={{ ...TAG_STYLE.weak, fontSize: 11, padding: '1px 6px' }}>취약</span>}
                     {nLesson > 0 && <span style={{ ...TAG_STYLE.lesson, fontSize: 11, padding: '1px 6px' }}>레슨 {nLesson}</span>}
                   </div>
-                  {s.note && <span style={{ fontSize: 12, color: 'var(--ink3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.note}</span>}
+                  {(s.note || reachText(s)) && <span style={{ fontSize: 12, color: 'var(--ink3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[reachText(s), s.note].filter(Boolean).join(' · ')}</span>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <StageBars stage={s.stage} />

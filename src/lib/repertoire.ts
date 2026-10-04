@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { exerciseTitle } from '../data/exercises'
-import { db, type DDay, type Entry, type Lesson, type Piece, type Section, type Settings } from './db'
+import { exerciseTitle, type Hand } from '../data/exercises'
+import { db, type Attempt, type DDay, type Entry, type HandKey, type Lesson, type Piece, type Section, type Settings } from './db'
 import { againToday, ddayCap, doneToday, newSrs, schedule, type Rating, type SrsOpts } from './srs'
 import { dateKey, daysAgo } from './time'
 
@@ -72,6 +72,60 @@ export function newSection(pieceId: number, order: number, label: string, target
     weak: false,
     srs: newSrs()
   }
+}
+
+// ── 손·마디 ──
+
+export const HAND_LABEL: Record<HandKey, Hand> = { B: '양손', R: '오른손', L: '왼손' }
+export const HAND_KEYS: HandKey[] = ['B', 'R', 'L']
+/** 구간 연습에서 함께 기록할 연습 방법 */
+export const PRACTICE_WAYS = ['암보', '리듬 변형', '끊어서', '페달 없이', '느리게']
+
+/** "m.33–48" → { a: 33, b: 48 } */
+export function parseMeasures(label: string) {
+  const m = label.match(/(\d+)\s*[–—\-~]\s*(\d+)/)
+  if (!m) return null
+  const a = Number(m[1])
+  const b = Number(m[2])
+  return b >= a && b - a < 400 ? { a, b } : null
+}
+
+export const spanText = (a: number, b: number) => (a === b ? `m.${a}` : `m.${a}–${b}`)
+
+/** 구간 처음부터 이어서 성공한 마지막 마디 (이전 기록 + 이번 성공) */
+export function mergeReach(start: number, end: number, prev: number | undefined, ok: { a: number; b: number }[]) {
+  const done = new Set<number>()
+  if (prev) for (let m = start; m <= Math.min(prev, end); m++) done.add(m)
+  for (const r of ok) for (let m = Math.max(start, r.a); m <= Math.min(end, r.b); m++) done.add(m)
+  let reach: number | undefined
+  for (let m = start; m <= end && done.has(m); m++) reach = m
+  return reach
+}
+
+/** 구간 표에 쓸 진도: "양손 m.44까지 · 오른손 끝까지" */
+export function reachText(s: Section) {
+  const r = parseMeasures(s.label)
+  if (!r || !s.reach) return ''
+  return HAND_KEYS.filter(h => s.reach![h])
+    .map(h => `${HAND_LABEL[h]} ${s.reach![h]! >= r.b ? '끝까지' : `m.${s.reach![h]}까지`}`)
+    .join(' · ')
+}
+
+/** 손마다 친 횟수·성공·마디 범위 */
+export function summarizeAttempts(log: Attempt[]) {
+  return HAND_KEYS.map(h => {
+    const mine = log.filter(x => x.h === h)
+    const spans = [...new Set(mine.filter(x => x.a).map(x => spanText(x.a, x.b)))]
+    return { h, n: mine.length, ok: mine.filter(x => x.ok).length, spans }
+  }).filter(x => x.n > 0)
+}
+
+/** 기록 목록에 쓸 한 줄: "양손 6 · 오른손 4 · 암보 2" */
+export function attemptLine(log: Attempt[] | undefined) {
+  if (!log?.length) return ''
+  const ways = new Map<string, number>()
+  for (const x of log) for (const w of x.w ?? []) ways.set(w, (ways.get(w) ?? 0) + 1)
+  return [...summarizeAttempts(log).map(x => `${HAND_LABEL[x.h]} ${x.n}번`), ...[...ways].map(([w, n]) => `${w} ${n}번`)].join(' · ')
 }
 
 /** "116마디를 16마디씩" → m.1–16, m.17–32 … */
