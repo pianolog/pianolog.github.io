@@ -255,7 +255,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
 
   return (
     <div className="full">
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '8px var(--pad) calc(24px + var(--safe-b))', maxWidth: 980, width: '100%', margin: '0 auto' }}>
+      <div className="pm">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, height: 80 }}>
           <button className="btn icon s1" style={{ color: 'var(--ink2)' }} onClick={close} aria-label="연습 끝내기">
             <Icon name="close" width={1.8} />
@@ -273,7 +273,9 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40, marginTop: 20 }}>
+        <div className="pm-body">
+        <div className="pm-main">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40, marginTop: 12 }}>
           <button onClick={togglePause} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <span style={{ fontSize: 14, fontWeight: 500, color: pausedAt ? 'var(--accentText)' : 'var(--ink3)' }}>{pausedAt ? '항목 · 일시정지' : '항목'}</span>
             <span style={{ fontSize: 44, fontWeight: 600, lineHeight: 1, opacity: pausedAt ? 0.5 : 1 }}>{clock(itemSec)}</span>
@@ -285,7 +287,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           </div>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 0 }}>
+        <div style={{ flex: '1 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '14px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 36, height: 30 }}>
             {beatsArr.map(i => {
               const on = m.playing && m.beat === i
@@ -294,7 +296,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
               return <span key={i} style={{ width: s, height: s, borderRadius: '50%', boxSizing: 'border-box', background: on || (!m.playing && first) ? 'var(--accent)' : 'transparent', border: on || (!m.playing && first) ? 'none' : '2px solid var(--line)', transform: on ? 'scale(1.15)' : 'none', transition: 'transform 60ms' }} />
             })}
           </div>
-          <div style={{ fontSize: target.refType === 'free' ? 'min(180px, 14vh)' : 'min(300px, 26vh)', fontWeight: 300, lineHeight: 0.95, letterSpacing: '-0.04em' }}>{m.bpm}</div>
+          <div className={`pm-bpm${target.refType === 'free' ? ' compact' : ''}`}>{m.bpm}</div>
           <button onClick={() => setEditLadder(true)} style={{ fontSize: 24, fontWeight: 500, color: 'var(--ink2)' }}>
             {m.beats}/4 · 목표 {ladder.target}
           </button>
@@ -327,6 +329,9 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           </div>
         </div>
 
+        </div>
+
+        <div className="pm-side">
         {target.refType === 'free' && (
           <div style={{ marginTop: 18 }}>
             <FreeCounterPanel st={att} bpm={m.bpm} farthest={farthest} />
@@ -370,6 +375,8 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           <button className="btn dark" style={{ height: 64, padding: '0 26px', borderRadius: 16, fontSize: 17 }} onClick={startFinish}>
             항목 끝내기
           </button>
+        </div>
+        </div>
         </div>
       </div>
 

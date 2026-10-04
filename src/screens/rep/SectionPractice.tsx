@@ -43,6 +43,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
   const [hand, setHand] = useState<HandKey>('B')
   const [span, setSpan] = useState<{ a: number; b: number } | null>(null) // null = 구간 전체
   const [pickFrom, setPickFrom] = useState<number | null>(null)
+  const [stripOpen, setStripOpen] = useState(false) // 마디 칸 펼치기
   const [ways, setWays] = useState<string[]>([])
   const bpmByHand = useRef<Partial<Record<HandKey, number>>>({})
   const [bothBpm, setBothBpm] = useState(0) // 양손으로 친 템포 — 구간 BPM으로 저장
@@ -87,6 +88,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     setHand('B')
     setSpan(null)
     setPickFrom(null)
+    setStripOpen(false)
     setWays([])
     bpmByHand.current = {}
     setBothBpm(section.bpm)
@@ -133,6 +135,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     } else {
       setSpan({ a: Math.min(pickFrom, n), b: Math.max(pickFrom, n) })
       setPickFrom(null)
+      setStripOpen(false)
     }
   }
   const undo = () => {
@@ -244,7 +247,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
 
   return (
     <div className="full">
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '8px var(--pad) calc(24px + var(--safe-b))', maxWidth: 980, width: '100%', margin: '0 auto' }}>
+      <div className="pm">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, height: 80 }}>
           <button className="btn icon s1" style={{ color: 'var(--ink2)' }} onClick={close} aria-label="연습 끝내기">
             <Icon name="close" width={1.8} />
@@ -286,7 +289,8 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
           </div>
         )}
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <div className="pm-body">
+        <div className="pm-main" style={{ alignItems: 'center', gap: 8, padding: '14px 0' }}>
           <div style={{ width: 'min(560px, 100%)', display: 'flex', gap: 4, marginBottom: 10 }}>
             {steps.map(v => {
               const cur = v === m.bpm || (v < m.bpm && (steps.find(x => x > v) ?? 999) > m.bpm)
@@ -299,7 +303,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
               )
             })}
           </div>
-          <div style={{ fontSize: 'min(170px, 14vh)', fontWeight: 300, lineHeight: 0.95, letterSpacing: '-0.04em' }}>{m.bpm}</div>
+          <div className="pm-bpm compact">{m.bpm}</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--ink2)' }}>{m.beats}/4 · 목표 {section.targetBpm}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
             <button className="btn icon s1" style={{ fontSize: 24, fontWeight: 500 }} onClick={() => metronome.nudge(-1)}>−</button>
@@ -313,6 +317,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
           </div>
         </div>
 
+        <div className="pm-side">
         <div style={{ background: 'var(--s1)', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
             {HAND_KEYS.map(h => {
@@ -344,35 +349,48 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
             <span className="caption" style={{ marginLeft: 'auto' }}>켜 둔 방법이 칠 때마다 함께 기록돼요</span>
           </div>
           {whole && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="sec-label">마디</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>
                   {cur ? spanText(cur.a, cur.b) : ''}
-                  {!span && ' (전체)'}
+                  {!span && ' 전체'}
                 </span>
-                <span className="caption">{pickFrom !== null ? '끝 마디를 누르세요' : '시작 → 끝 마디를 누르면 범위를 좁혀요 · 초록 줄 = 통과'}</span>
+                {stripOpen ? (
+                  <span className="caption" style={{ flex: 1 }}>{pickFrom !== null ? '끝 마디를 누르세요' : '시작 마디 → 끝 마디 순서로 누르세요 · 초록 줄 = 통과'}</span>
+                ) : (
+                  <button onClick={() => setStripOpen(true)} aria-label="마디 범위 고르기" style={{ flex: 1, minWidth: 60, height: 28, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {Array.from({ length: whole.b - whole.a + 1 }, (_, i) => whole.a + i).map(n => (
+                      <span key={n} style={{ flex: 1, height: span && n >= span.a && n <= span.b ? 14 : 8, borderRadius: 2, background: passed.has(n) ? 'var(--ok)' : span && n >= span.a && n <= span.b ? 'var(--accent)' : 'var(--line)' }} />
+                    ))}
+                  </button>
+                )}
                 {span && (
-                  <button className="link" style={{ marginLeft: 'auto', fontSize: 14 }} onClick={() => { setSpan(null); setPickFrom(null); setStreak(0) }}>
+                  <button className="link" style={{ fontSize: 14, whiteSpace: 'nowrap' }} onClick={() => { setSpan(null); setPickFrom(null); setStreak(0) }}>
                     전체로
                   </button>
                 )}
+                <button className="btn sm" style={{ height: 40, flex: 'none' }} onClick={() => { setStripOpen(o => !o); setPickFrom(null) }}>
+                  {stripOpen ? '닫기' : '범위 고르기'}
+                </button>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {Array.from({ length: whole.b - whole.a + 1 }, (_, i) => whole.a + i).map(n => {
-                  const inSpan = !!span && n >= span.a && n <= span.b
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => tapMeasure(n)}
-                      style={{ flex: '1 0 40px', maxWidth: 64, height: 40, borderRadius: 8, fontSize: 14, fontWeight: 600, position: 'relative', background: inSpan ? 'color-mix(in oklch, var(--accent) 35%, var(--s1))' : 'var(--bg)', border: n === pickFrom ? '2px solid var(--accent)' : '2px solid transparent', color: inSpan ? 'var(--ink)' : 'var(--ink2)' }}
-                    >
-                      {n}
-                      {passed.has(n) && <span style={{ position: 'absolute', left: 6, right: 6, bottom: 3, height: 3, borderRadius: 2, background: 'var(--ok)' }} />}
-                    </button>
-                  )
-                })}
-              </div>
+              {stripOpen && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {Array.from({ length: whole.b - whole.a + 1 }, (_, i) => whole.a + i).map(n => {
+                    const inSpan = !!span && n >= span.a && n <= span.b
+                    return (
+                      <button
+                        key={n}
+                        onClick={() => tapMeasure(n)}
+                        style={{ flex: '1 0 40px', maxWidth: 64, height: 40, borderRadius: 8, fontSize: 14, fontWeight: 600, position: 'relative', background: inSpan ? 'color-mix(in oklch, var(--accent) 35%, var(--s1))' : 'var(--bg)', border: n === pickFrom ? '2px solid var(--accent)' : '2px solid transparent', color: inSpan ? 'var(--ink)' : 'var(--ink2)' }}
+                      >
+                        {n}
+                        {passed.has(n) && <span style={{ position: 'absolute', left: 6, right: 6, bottom: 3, height: 3, borderRadius: 2, background: 'var(--ok)' }} />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -409,16 +427,18 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <button className="tap" onClick={miss} style={{ height: 136, borderRadius: 24, background: 'var(--s1)', color: 'var(--alert)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, fontSize: 28, fontWeight: 700 }}>
+          <button className="tap pm-hit" onClick={miss} style={{ borderRadius: 24, background: 'var(--s1)', color: 'var(--alert)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, fontSize: 28, fontWeight: 700 }}>
             <Icon name="close" size={30} width={2.4} /> 실수
           </button>
-          <button className="tap" onClick={hit} style={{ height: 136, borderRadius: 24, background: 'var(--accent)', color: 'var(--accentInk)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, fontSize: 28, fontWeight: 700 }}>
+          <button className="tap pm-hit" onClick={hit} style={{ borderRadius: 24, background: 'var(--accent)', color: 'var(--accentInk)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, fontSize: 28, fontWeight: 700 }}>
             <Icon name="check" size={32} width={2.6} /> 성공
           </button>
         </div>
         <button className="btn dark" style={{ marginTop: 12, height: 60, borderRadius: 16, fontSize: 17 }} onClick={() => { metronome.stop(); setPausedAt(p => p ?? Date.now()); setFinishing(true) }}>
           구간 끝내기
         </button>
+        </div>
+        </div>
       </div>
 
       {finishing && (
