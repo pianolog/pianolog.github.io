@@ -6,6 +6,7 @@ import { db, type Section } from '../../lib/db'
 import { ddayLabel, openLessons, reachText, recommend, sectionDue, STAGES, useRepData, type Tag } from '../../lib/repertoire'
 import { clock, dateKey, parseDateKey, shortDate } from '../../lib/time'
 import { useNav } from '../../nav'
+import { imslpUrl } from '../../lib/catalog'
 import { ScorePicker } from '../ScorePicker'
 import { Dot, PieceSheet, SectionSheet, StageBars } from './RepSheets'
 
@@ -80,6 +81,9 @@ export function PieceDetail({ pieceId }: { pieceId: number }) {
             ))}
             {d && <span className="chip" style={{ fontSize: 13, fontWeight: 600 }}>{d.title} {ddayLabel(d.date)}</span>}
             {piece.scoreId ? <button className="chip" style={{ fontSize: 13 }} onClick={() => setPicking(true)}>악보 바꾸기</button> : null}
+            <a className="chip" style={{ fontSize: 13, textDecoration: 'none', color: 'inherit' }} href={imslpUrl(piece.catalog?.composer ?? piece.composer, piece.catalog?.title ?? piece.title)} target="_blank" rel="noopener noreferrer">
+              IMSLP에서 악보 찾기 ↗
+            </a>
             {runs[0] && <span className="caption" style={{ marginLeft: 'auto' }}>최근 런스루 {shortDate(parseDateKey(runs[0].date))} · {clock(runs[0].durationSec)} · 마킹 {runs[0].marks.length}</span>}
           </div>
         </div>

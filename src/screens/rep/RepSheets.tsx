@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Icon } from '../../components/Icon'
 import { Sheet, SheetHead, useToast } from '../../components/ui'
@@ -6,6 +6,7 @@ import { db, type DDay, type Piece, type RepList, type Section } from '../../lib
 import { LIST_COLORS, STAGES, newSection, pieceName, sectionDue, splitMeasures } from '../../lib/repertoire'
 import { ivlLabel, newSrs, type Srs } from '../../lib/srs'
 import { dateKey } from '../../lib/time'
+import { koreanize, partHint, searchCatalog, searchOnline, type CatalogWork } from '../../lib/catalog'
 
 const fieldOnSheet = { background: 'var(--bg)' }
 
@@ -32,7 +33,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function Num({ value, onChange, w = 90 }: { value: number; onChange: (n: number) => void; w?: number }) {
+function Num({ value, onChange, w = 90, onPanel }: { value: number; onChange: (n: number) => void; w?: number; onPanel?: boolean }) {
   return (
     <input
       className="field"
@@ -42,7 +43,7 @@ function Num({ value, onChange, w = 90 }: { value: number; onChange: (n: number)
         const n = parseInt(e.target.value.replace(/\D/g, ''), 10)
         onChange(Number.isNaN(n) ? 0 : n)
       }}
-      style={{ ...fieldOnSheet, width: w, textAlign: 'center', fontWeight: 600 }}
+      style={{ background: onPanel ? 'var(--s1)' : 'var(--bg)', width: w, textAlign: 'center', fontWeight: 600 }}
     />
   )
 }
@@ -106,10 +107,56 @@ export function PieceSheet({ piece, defaultListId, onClose, onCreated }: { piece
   const [size, setSize] = useState(16)
   const [target, setTarget] = useState(60)
   const toast = useToast()
+  // 곡 목록 검색
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<CatalogWork[]>([])
+  const [online, setOnline] = useState<'idle' | 'loading' | 'none' | 'error'>('idle')
+  const [catalog, setCatalog] = useState(piece?.catalog)
+  const [base, setBase] = useState('') // 고른 곡의 한글 곡명 (번호·악장 붙이기 전)
+  const [part, setPart] = useState('')
+  const hint = catalog ? partHint(catalog.title) : null
+  useEffect(() => {
+    setOnline('idle')
+    if (!query.trim()) return setResults([])
+    let alive = true
+    const t = setTimeout(() => void searchCatalog(query).then(r => alive && setResults(r)), 120)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [query])
+  const findOnline = async () => {
+    setOnline('loading')
+    try {
+      const r = await searchOnline(query)
+      setResults(x => [...x, ...r.filter(w => !x.some(y => y.title === w.title && y.composer === w.composer))])
+      setOnline(r.length ? 'idle' : 'none')
+    } catch {
+      setOnline('error')
+    }
+  }
+  const pick = (w: CatalogWork) => {
+    const k = koreanize(w.title)
+    setTitle(k.title)
+    setBase(k.title)
+    setPart('')
+    setOpus(k.opus)
+    setComposer(w.ko ?? w.composer)
+    setCatalog({ composer: w.composer, title: w.title })
+    setQuery('')
+    setResults([])
+  }
+  const changePart = (v: string) => {
+    setPart(v)
+    const n = v.trim()
+    // 곡집의 번호를 고르면 "13개의 전주곡" → "전주곡 5번"
+    const head = hint === '번' && /^\d+$/.test(n) ? base.replace(/^\d+개의 /, '') : base
+    setTitle(n ? `${head} ${/^\d+$/.test(n) ? `${n}${hint ?? '번'}` : n}` : base)
+  }
 
   const save = async () => {
     if (!title.trim()) return
-    const data = { title: title.trim(), composer: composer.trim(), opus: opus.trim(), memo: memo.trim(), listIds }
+    const data = { title: title.trim(), composer: composer.trim(), opus: opus.trim(), memo: memo.trim(), listIds, catalog }
     if (piece?.id) {
       await db.pieces.update(piece.id, data)
       onClose()
@@ -126,8 +173,54 @@ export function PieceSheet({ piece, defaultListId, onClose, onCreated }: { piece
     <Sheet onClose={onClose}>
       <SheetHead title={piece ? '곡 정보' : '곡 추가'} sub="곡명만 있으면 돼요. 악장·곡 단위로 따로 만들어도 좋아요." onClose={onClose} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 22 }}>
+        {!piece && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span className="sec-label">곡 찾기 (선택)</span>
+            <input className="field" style={fieldOnSheet} value={query} onChange={e => setQuery(e.target.value)} placeholder="예) 쇼팽 발라드 1 · 베토벤 소나타 op 110 · 라흐마니노프 전주곡" autoFocus />
+            {query.trim() && (
+              <div style={{ maxHeight: 320, overflowY: 'auto', background: 'var(--bg)', borderRadius: 14, padding: '4px 0' }}>
+                {results.map(w => {
+                  const k = koreanize(w.title)
+                  return (
+                    <button key={`${w.composer}|${w.title}`} onClick={e => { e.preventDefault(); pick(w) }} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 16px', textAlign: 'left', borderBottom: '1px solid var(--line)' }}>
+                      <span style={{ fontSize: 16, fontWeight: 600 }}>
+                        <span style={{ color: 'var(--ink2)', marginRight: 8 }}>{w.ko ?? w.composer}</span>
+                        {k.title}
+                        {k.opus && <span style={{ color: 'var(--ink3)', fontWeight: 500, marginLeft: 8 }}>{k.opus}</span>}
+                        {w.online && <span style={{ fontSize: 11, color: 'var(--accentText)', marginLeft: 8 }}>온라인</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--ink3)' }}>{w.composer} · {w.title}</span>
+                    </button>
+                  )
+                })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px' }}>
+                  <span className="caption">{results.length ? `${results.length}곡` : '앱 안 목록에 없어요.'}</span>
+                  <button className="link" style={{ marginLeft: 'auto', fontSize: 14 }} disabled={online === 'loading'} onClick={e => { e.preventDefault(); void findOnline() }}>
+                    {online === 'loading' ? '찾는 중…' : online === 'none' ? '온라인에도 없어요' : online === 'error' ? '인터넷 연결을 확인하세요' : '온라인에서 더 찾기'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {catalog && !query.trim() && (
+              <span className="caption">
+                {catalog.composer} · {catalog.title}
+                <button className="link" style={{ fontSize: 13, marginLeft: 10 }} onClick={e => { e.preventDefault(); setCatalog(undefined); setBase(''); setPart('') }}>
+                  연결 해제
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+        {catalog && hint && base && (
+          <Field label={hint === '악장' ? '악장 (선택)' : '번호 (선택)'}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input className="field" style={{ ...fieldOnSheet, width: 120 }} inputMode={hint === '번' ? 'numeric' : undefined} value={part} onChange={e => changePart(e.target.value)} placeholder={hint === '악장' ? '예) 1' : '예) 2'} />
+              <span className="caption">{hint === '악장' ? '숫자를 넣으면 "1악장"처럼 곡명 뒤에 붙어요.' : '곡집에서 칠 곡 번호. 곡명 뒤에 "2번"처럼 붙어요.'}</span>
+            </div>
+          </Field>
+        )}
         <Field label="곡명 (필수)">
-          <input className="field" style={fieldOnSheet} value={title} onChange={e => setTitle(e.target.value)} placeholder="소나타 Op.110 1악장" autoFocus />
+          <input className="field" style={fieldOnSheet} value={title} onChange={e => setTitle(e.target.value)} placeholder="소나타 Op.110 1악장" autoFocus={!!piece} />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="작곡가">
@@ -155,11 +248,11 @@ export function PieceSheet({ piece, defaultListId, onClose, onCreated }: { piece
             <span className="sec-label">구간 자동으로 나누기 (선택)</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span className="caption">총</span>
-              <Num value={total} onChange={setTotal} w={80} />
+              <Num value={total} onChange={setTotal} w={80} onPanel />
               <span className="caption">마디를</span>
-              <Num value={size} onChange={setSize} w={70} />
+              <Num value={size} onChange={setSize} w={70} onPanel />
               <span className="caption">마디씩, 목표</span>
-              <Num value={target} onChange={setTarget} w={80} />
+              <Num value={target} onChange={setTarget} w={80} onPanel />
               <span className="caption">BPM</span>
             </div>
             {total > 0 && size > 0 && <span className="caption">{splitMeasures(total, size).join(' · ')}</span>}

@@ -78,6 +78,7 @@ export interface Piece {
   archived: 0 | 1
   createdAt: number
   scoreId?: number | null
+  catalog?: { composer: string; title: string } // 곡 목록에서 고른 원래 이름 (IMSLP 검색에 씀)
 }
 
 /** 구간 연습에서 친 손: 양손 / 오른손 / 왼손 */
