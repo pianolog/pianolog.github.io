@@ -85,7 +85,7 @@ export const SCALE_KINDS: { id: ScaleKind; label: string }[] = [
 export interface ScaleSet {
   keys: number[] // 고른 조 (KEYS 위치 0–11)
   start: number // 시작 조
-  dir: 'cw' | 'ccw' // 5도씩(시계 방향) / 4도씩(반시계 방향)
+  dir: 'cw' | 'ccw' // 5도씩(원에서 반시계 방향) / 4도씩(시계 방향)
   kinds: ScaleKind[]
 }
 

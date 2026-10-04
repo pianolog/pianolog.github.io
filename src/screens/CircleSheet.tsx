@@ -63,7 +63,7 @@ export function CircleSheet({ onClose, saveOnly }: { onClose: () => void; saveOn
       <div style={{ display: 'flex', gap: 24, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} style={{ flex: 'none', maxWidth: '100%', touchAction: 'manipulation' }}>
           {KEYS.map((k, i) => {
-            const mid = -90 + i * 30
+            const mid = -90 - i * 30 // C 위, 오른쪽으로 F → B♭ (4도씩 시계 방향)
             const on = set.keys.includes(i)
             const isStart = on && i === set.start
             const fill = on ? 'color-mix(in oklch, var(--accent) 70%, var(--s1))' : 'var(--s2)'
