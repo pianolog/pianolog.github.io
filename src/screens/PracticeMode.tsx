@@ -12,6 +12,9 @@ import { clock, dateKey } from '../lib/time'
 import { useNav, type BasicTarget, type PracticeTarget } from '../nav'
 import { nextRoutineTarget, targetLabel } from '../lib/flow'
 import { FinishSheet, type FinishData } from './FinishSheet'
+import { FreeCounterPanel, FreeSummary, mainHand, mergeFarthest, useAttemptLog } from './FreeCounter'
+import { HAND_LABEL } from '../lib/repertoire'
+import type { HandKey } from '../lib/db'
 import { ScoreScreen } from './ScoreScreen'
 import { ScorePicker } from './ScorePicker'
 
@@ -45,6 +48,10 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
   const [score, setScore] = useState<{ id: number; page: number } | null>(null)
   const [picking, setPicking] = useState(false)
   const lastHands = useRef<Hand>('양손')
+  // 자유 연습: 손·마디·방법별 횟수
+  const att = useAttemptLog()
+  const [farthest, setFarthest] = useState<Partial<Record<HandKey, number>>>({})
+  const freeKey = target.refType === 'free' ? `freeReach:${target.title}` : null
   const lastVars = useRef<string[]>([])
   const now = useNow()
   useWakeLock(true)
@@ -93,6 +100,9 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
     setPausedAt(null)
     setPausedTotal(0)
     setMaxBpm(0)
+    att.reset()
+    setFarthest({})
+    if (freeKey) void db.settings.get(freeKey).then(r => alive && setFarthest((r?.value as Partial<Record<HandKey, number>>) ?? {}))
     return () => {
       alive = false
     }
@@ -158,10 +168,15 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
       variations: d.variations,
       rating: d.rating,
       memo: d.memo.trim(),
+      ...(target.refType === 'free' && att.log.length
+        ? { attemptLog: att.log, attempts: att.log.length, successes: att.log.filter(x => x.ok).length, variations: [...new Set([...d.variations, ...att.log.flatMap(x => x.w ?? [])])] }
+        : {}),
       grade: d.grade ?? undefined,
       srsKind: graded?.kind
     }
     const entryId = await db.entries.add(entry)
+    const prevFarthest = farthest
+    if (freeKey && att.log.length) await db.settings.put({ key: freeKey, value: mergeFarthest(farthest, att.log) })
     await db.sessions.update(sessionId, { endedAt: Date.now() })
     lastHands.current = d.hands
     lastVars.current = d.variations
@@ -180,6 +195,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
       run: () => {
         void db.entries.delete(entryId as number)
         if (graded) void restoreCard(graded.id, graded.prev)
+        if (freeKey) void db.settings.put({ key: freeKey, value: prevFarthest })
         if (requeue) setTarget(x => (x.refType === 'free' ? x : { ...x, queue: x.queue.slice(0, -1), keys: x.keys?.slice(0, -1) }))
       }
     }
@@ -278,7 +294,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
               return <span key={i} style={{ width: s, height: s, borderRadius: '50%', boxSizing: 'border-box', background: on || (!m.playing && first) ? 'var(--accent)' : 'transparent', border: on || (!m.playing && first) ? 'none' : '2px solid var(--line)', transform: on ? 'scale(1.15)' : 'none', transition: 'transform 60ms' }} />
             })}
           </div>
-          <div style={{ fontSize: 'min(300px, 26vh)', fontWeight: 300, lineHeight: 0.95, letterSpacing: '-0.04em' }}>{m.bpm}</div>
+          <div style={{ fontSize: target.refType === 'free' ? 'min(180px, 14vh)' : 'min(300px, 26vh)', fontWeight: 300, lineHeight: 0.95, letterSpacing: '-0.04em' }}>{m.bpm}</div>
           <button onClick={() => setEditLadder(true)} style={{ fontSize: 24, fontWeight: 500, color: 'var(--ink2)' }}>
             {m.beats}/4 · 목표 {ladder.target}
           </button>
@@ -311,7 +327,13 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 24, padding: '16px 16px 16px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {target.refType === 'free' && (
+          <div style={{ marginTop: 18 }}>
+            <FreeCounterPanel st={att} bpm={m.bpm} farthest={farthest} />
+          </div>
+        )}
+
+        <div className="card" style={{ marginTop: target.refType === 'free' ? 12 : 24, padding: target.refType === 'free' ? '12px 16px 12px 22px' : '16px 16px 16px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <button onClick={() => setEditLadder(true)} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span style={{ fontSize: 15, fontWeight: 600 }}>템포 사다리</span>
@@ -360,7 +382,8 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           variations={varList}
           srsFor={target.refType === 'free' ? undefined : k => cardSrs(cards, target.refType as 'hanon', no, target.refType === 'hanon' ? k : undefined)}
           srsOpts={{ maxIvl: settings.maxIvl, leechAt: settings.leechAt }}
-          initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key: target.refType === 'scale' ? undefined : key, hands: lastHands.current, variations: lastVars.current.filter(v => varList.includes(v)), rating: 0, memo: '', grade: target.refType === 'free' ? null : 'good' }}
+          extra={target.refType === 'free' && att.log.length ? <FreeSummary log={att.log} before={farthest} /> : undefined}
+          initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key: target.refType === 'scale' ? undefined : key, hands: target.refType === 'free' && att.log.length ? HAND_LABEL[mainHand(att.log)] : lastHands.current, variations: lastVars.current.filter(v => varList.includes(v)), rating: 0, memo: '', grade: target.refType === 'free' ? null : 'good' }}
           nextLabel={nextLabel}
           onSave={save}
           onClose={cancelFinish}

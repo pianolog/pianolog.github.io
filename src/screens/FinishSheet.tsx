@@ -28,6 +28,7 @@ export function FinishSheet({
   variations,
   srsFor,
   srsOpts,
+  extra,
   onSave,
   onClose
 }: {
@@ -40,6 +41,7 @@ export function FinishSheet({
   variations: readonly string[]
   srsFor?: (key?: Key) => Srs // 기초 카드: 지금 고른 조의 카드
   srsOpts?: SrsOpts
+  extra?: React.ReactNode // 자유 연습: 손·마디별 횟수 요약
   onSave: (d: FinishData, next: boolean) => void
   onClose: () => void
 }) {
@@ -64,6 +66,7 @@ export function FinishSheet({
       <SheetHead title="항목 끝내기" sub={summary} onClose={onClose} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28, marginTop: 26 }}>
+        {extra}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <BpmStepper label="도달 BPM" hint={`자동 ${initial.bpm}`} value={d.bpm} onChange={bpm => set({ bpm })} />
           <BpmStepper label="클린 BPM" hint={`자동 ${initial.cleanBpm}`} value={d.cleanBpm} onChange={cleanBpm => set({ cleanBpm })} accent />
