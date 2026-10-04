@@ -8,6 +8,7 @@ import { exportBackup, importBackup } from '../lib/backup'
 import { useSettings } from '../lib/hooks'
 import { forgetScore } from '../lib/pdf'
 import { useNav } from '../nav'
+import { InstallGuide, isStandalone } from '../components/InstallGuide'
 import { PdfUploadButton } from './ScorePicker'
 
 function Row({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
@@ -29,6 +30,7 @@ export function SettingsPage() {
   const scores = useLiveQuery(() => db.scores.orderBy('createdAt').reverse().toArray(), [], [])
   const [mapping, setMapping] = useState<ScoreBook | null>(null)
   const [splitting, setSplitting] = useState(false)
+  const [guide, setGuide] = useState(false)
   const [usage, setUsage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -142,6 +144,12 @@ export function SettingsPage() {
           ))}
         </div>
 
+        <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <Row label="홈 화면에 설치" sub={isStandalone() ? '홈 화면 앱으로 쓰고 있어요' : '지금은 Safari 탭이에요 · 홈 화면 앱으로 쓰면 기록이 더 안전해요'}>
+            <button className="btn sm" onClick={() => setGuide(true)}>설치하는 법</button>
+          </Row>
+        </div>
+
         <div className="card">
           <div className="card-head">
             <span className="t">백업<span className="sub">기록은 이 iPad 안에만 저장돼요</span></span>
@@ -179,6 +187,7 @@ export function SettingsPage() {
 
       {mapping && <BookMapSheet book={mapping} splits={s.pischnaSplits} value={mapping === 'hanon' ? s.hanonBook : s.pischnaBook} onClose={() => setMapping(null)} />}
       {splitting && <SplitSheet value={s.pischnaSplits} onClose={() => setSplitting(false)} />}
+      {guide && <InstallGuide fromSettings onClose={() => setGuide(false)} />}
     </div>
   )
 }

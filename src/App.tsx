@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon, type IconName } from './components/Icon'
 import { ToastProvider } from './components/ui'
+import { InstallGuide, shouldShowInstallGuide } from './components/InstallGuide'
 import { requestPersist } from './lib/backup'
 import { useSettings, useThemeAttr } from './lib/hooks'
 import { metronome } from './lib/metronome'
@@ -34,6 +35,8 @@ export function App() {
   const [score, setScore] = useState<{ id: number; page: number } | null>(null)
   const [run, setRun] = useState<number | null>(null)
   const [practiceKey, setPracticeKey] = useState(0)
+  // Safari 탭에서 처음 열면 홈 화면 설치 안내
+  const [guide, setGuide] = useState(shouldShowInstallGuide)
 
   useEffect(() => {
     void requestPersist()
@@ -89,6 +92,7 @@ export function App() {
             ))}
           </nav>
         </div>
+        {guide && !practice && <InstallGuide onClose={() => setGuide(false)} />}
         {practice && (practice.refType === 'section' ? <SectionPractice key={practiceKey} target={practice} onClose={() => setPractice(null)} /> : <PracticeMode key={practiceKey} target={practice} onClose={() => setPractice(null)} />)}
         {run !== null && (
           <RunThrough
