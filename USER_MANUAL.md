@@ -99,7 +99,7 @@
 
 ### A. 준비
 
-- 앱 주소: (GitHub Pages 배포 후 여기에 적습니다)
+- 앱 주소: https://suncheongwon281-web.github.io/piano-practice/
 
 ### B. 절차
 
