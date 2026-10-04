@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { exerciseTitle, variationsFor, type Hand, type Key } from '../data/exercises'
+import { exerciseTitle, hanonNoOf, variationsFor, type Hand, type Key } from '../data/exercises'
 import { Icon, PauseIcon, PlayIcon } from '../components/Icon'
 import { Sheet, SheetHead, useToast } from '../components/ui'
 import { db, type Entry } from '../lib/db'
@@ -238,6 +238,9 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
   // 자유 연습은 제목별, 스케일은 한 권으로 악보를 기억한다
   const pickKey = target.refType === 'free' ? `score:free:${target.title}` : target.refType === 'scale' ? 'score:scale' : null
   const openScore = async () => {
+    // 스케일·아르페지오: 하농 책에 39–43번 페이지가 있으면 그 페이지
+    const hp = target.refType === 'scale' ? settings.hanonBook.pages[hanonNoOf(no)] : undefined
+    if (hp && settings.hanonBook.scoreId && (await db.scores.get(settings.hanonBook.scoreId))) return setScore({ id: settings.hanonBook.scoreId, page: hp })
     if (pickKey) {
       const r = await db.settings.get(pickKey)
       const v = r?.value as { id: number; page: number } | undefined

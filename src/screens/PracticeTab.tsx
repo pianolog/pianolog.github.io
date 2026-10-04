@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { KEYS, MINORS, bookItems, scaleNo, type ScoreBook } from '../data/exercises'
+import { CHROMATIC, KEYS, MINORS, bookItems, scaleNo, type ScoreBook } from '../data/exercises'
 import { Icon, PlayIcon } from '../components/Icon'
 import { Segmented, StatusIcon } from '../components/ui'
 import { useEntries, useRoutine, useSettings } from '../lib/hooks'
@@ -85,11 +85,22 @@ export function PracticeTab() {
               <button className="btn" style={{ alignSelf: 'flex-start', marginBottom: 6 }} onClick={() => setCircle(true)}>
                 5도권으로 묶어서 연습
               </button>
-              {[0, 12].map(off => (
-                <div key={off} style={{ display: 'grid', gridTemplateColumns: '64px repeat(12, minmax(0, 1fr))', gap: 6, alignItems: 'center' }}>
-                  <span className="caption">{off ? '단조' : '장조'}</span>
+              {(book === 'arpeggio'
+                ? [
+                    { kind: 1, off: 0, label: '41 장조' },
+                    { kind: 1, off: 12, label: '41 단조' },
+                    { kind: 3, off: 0, label: '42 속7' },
+                    { kind: 4, off: 0, label: '43 감7' }
+                  ]
+                : [
+                    { kind: 0, off: 0, label: '39 장조' },
+                    { kind: 0, off: 12, label: '39 단조' }
+                  ]
+              ).map(({ kind, off, label }) => (
+                <div key={`${kind}-${off}`} style={{ display: 'grid', gridTemplateColumns: '64px repeat(12, minmax(0, 1fr))', gap: 6, alignItems: 'center' }}>
+                  <span className="caption">{label}</span>
                   {KEYS.map((k, i) => {
-                    const no = scaleNo(book === 'arpeggio' ? 1 : 0, i + off)
+                    const no = scaleNo(kind as 0 | 1 | 3 | 4, i + off)
                     return (
                       <button key={no} className="tap serif" onClick={() => nav.startPractice({ refType: 'scale', queue: [no] })} style={{ height: 52, borderRadius: 10, fontSize: 17, fontWeight: 600, ...doneStyle(no) }}>
                         {off ? MINORS[i] : k}
@@ -98,6 +109,14 @@ export function PracticeTab() {
                   })}
                 </div>
               ))}
+              {book === 'scale' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '64px repeat(12, minmax(0, 1fr))', gap: 6, alignItems: 'center' }}>
+                  <span className="caption">40</span>
+                  <button className="tap" onClick={() => nav.startPractice({ refType: 'scale', queue: [CHROMATIC] })} style={{ gridColumn: 'span 3', height: 52, borderRadius: 10, fontSize: 16, fontWeight: 600, ...doneStyle(CHROMATIC) }}>
+                    반음계
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {book === 'hanon' && <div className="caption" style={{ marginTop: 12 }}>오늘의 조 <span className="serif" style={{ fontWeight: 600, color: 'var(--accentText)' }}>{key}</span>로 시작해요. 조는 항목을 끝낼 때 바꿀 수 있어요.</div>}

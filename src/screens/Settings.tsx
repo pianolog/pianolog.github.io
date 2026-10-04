@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BOOK_NAME, KEYS, PISCHNA_SIZE, bookItems, type ScoreBook } from '../data/exercises'
+import { BOOK_NAME, HANON_SCALE_ITEMS, KEYS, PISCHNA_SIZE, bookItems, type ScoreBook } from '../data/exercises'
 import { Icon } from '../components/Icon'
 import { Segmented, Sheet, SheetHead, useToast } from '../components/ui'
 import { db, saveSetting, type BookMap } from '../lib/db'
@@ -210,6 +210,27 @@ function BookMapSheet({ book, splits, value, onClose }: { book: ScoreBook; split
     return Number.isNaN(n) ? 0 : n
   }
 
+  const pageBox = (n: number, label: string) => (
+    <label key={n} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+      <span style={{ fontSize: 12, color: 'var(--ink3)', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</span>
+      <input
+        className="field"
+        inputMode="numeric"
+        value={pages[n] || ''}
+        onChange={e => {
+          const v = num(e.target.value)
+          setPages(p => {
+            const x = { ...p }
+            if (v) x[n] = Math.min(max, v)
+            else delete x[n]
+            return x
+          })
+        }}
+        style={{ height: 44, padding: 0, textAlign: 'center', fontWeight: 600 }}
+      />
+    </label>
+  )
+
   return (
     <Sheet onClose={onClose}>
       <SheetHead title={`${BOOK_NAME[book]} 악보 연결`} sub="책 한 권짜리 PDF를 고르고, 각 번호가 시작하는 페이지를 적어요." onClose={onClose} />
@@ -233,27 +254,20 @@ function BookMapSheet({ book, splits, value, onClose }: { book: ScoreBook; split
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(0, 1fr))', gap: 6, marginTop: 16 }}>
-        {items.map(({ no: n, label }) => (
-          <label key={n} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--ink3)', fontWeight: 600 }}>{label}번</span>
-            <input
-              className="field"
-              inputMode="numeric"
-              value={pages[n] || ''}
-              onChange={e => {
-                const v = num(e.target.value)
-                setPages(p => {
-                  const x = { ...p }
-                  if (v) x[n] = Math.min(max, v)
-                  else delete x[n]
-                  return x
-                })
-              }}
-              style={{ height: 44, padding: 0, textAlign: 'center', fontWeight: 600 }}
-            />
-          </label>
-        ))}
+        {items.map(({ no: n, label }) => pageBox(n, `${label}번`))}
       </div>
+
+      {book === 'hanon' && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 20 }}>
+            <span className="sec-label">스케일·아르페지오</span>
+            <span className="caption">스케일·아르페지오 연습에서 [악보]를 누르면 이 페이지가 열려요.</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 6, marginTop: 8 }}>
+            {HANON_SCALE_ITEMS.map(({ no: n, label }) => pageBox(n, label))}
+          </div>
+        </>
+      )}
 
       <button className="btn primary" style={{ marginTop: 22, height: 64 }} onClick={save} disabled={!scoreId}>
         저장

@@ -38,6 +38,15 @@ export const PISCHNA_SIZE = 60
 const SUB = ['', 'a', 'b']
 export const pischnaLabel = (no: number) => `${Math.floor(no / 10)}${SUB[no % 10] ?? ''}`
 
+/** 하농 책 PDF에서 페이지를 지정할 수 있는 스케일·아르페지오 번호 */
+export const HANON_SCALE_ITEMS: BookItem[] = [
+  { no: 39, label: '39 스케일' },
+  { no: 40, label: '40 반음계' },
+  { no: 41, label: '41 아르페지오' },
+  { no: 42, label: '42 속7화음' },
+  { no: 43, label: '43 감7화음' }
+]
+
 export function bookItems(book: ScoreBook, pischnaSplits: number[]): BookItem[] {
   if (book === 'hanon') {
     return Array.from({ length: HANON_TO - HANON_FROM + 1 }, (_, i) => ({ no: HANON_FROM + i, label: String(HANON_FROM + i) }))
@@ -50,19 +59,38 @@ export function bookItems(book: ScoreBook, pischnaSplits: number[]): BookItem[] 
   return out
 }
 
-// ── 스케일·아르페지오 ──
-// 번호 = 종류(0 스케일, 1 아르페지오) × 100 + 조(0–11 장조 KEYS 순서, 12–23 관계 단조)
+// ── 스케일·아르페지오 (하농 3부) ──
+// 하농 39 스케일 24조 · 40 반음계 · 41 아르페지오 24조 · 42 속7화음 아르페지오 12조 · 43 감7화음 아르페지오 12조
+// 번호 = 종류 × 100 + 조
+//   0xx 스케일, 1xx 아르페지오 — 조 0–11 장조(KEYS 순서), 12–23 관계 단조
+//   200 반음계 · 3xx 속7화음 · 4xx 감7화음 — 조 0–11 (KEYS 순서)
 
-export const scaleNo = (kind: 0 | 1, keyIdx: number) => kind * 100 + keyIdx
-export const isArpeggio = (no: number) => no >= 100
-export const isMinor = (no: number) => no % 100 >= 12
+export const CHROMATIC = 200
+export const scaleNo = (kind: 0 | 1 | 3 | 4, keyIdx: number) => kind * 100 + keyIdx
+export const scaleKind = (no: number) => Math.floor(no / 100)
+export const isArpeggio = (no: number) => [1, 3, 4].includes(scaleKind(no))
+export const isMinor = (no: number) => scaleKind(no) <= 1 && no % 100 >= 12
+
+/** 이 스케일·아르페지오가 실린 하농 번호 */
+export const HANON_OF_KIND: Record<number, number> = { 0: 39, 1: 41, 2: 40, 3: 42, 4: 43 }
+export const hanonNoOf = (no: number) => HANON_OF_KIND[scaleKind(no)]
+
+/** 하농 39·41 순서: C, a, G, e, D, b … (장조 다음 관계 단조) */
+export const HANON_KEY_ORDER = KEYS.flatMap((_, i) => [i, i + 12])
+
+/** 장조의 딸림음 (F♯ 장조는 C♯) */
+export const dominantOf = (i: number) => (i === 6 ? 'C♯' : KEYS[(i + 1) % 12])
 
 export function keyName(idx: number) {
   return idx < 12 ? `${KEYS[idx]} major` : `${MINORS[idx - 12]} minor`
 }
 
 export function scaleTitle(no: number) {
-  return `${isArpeggio(no) ? '아르페지오' : '스케일'} ${keyName(no % 100)}`
+  const k = scaleKind(no)
+  if (k === 2) return '반음계 스케일'
+  if (k === 3) return `속7화음 아르페지오 ${KEYS[no % 100]} (${dominantOf(no % 100)}7)`
+  if (k === 4) return `감7화음 아르페지오 ${KEYS[no % 100]}`
+  return `${k === 1 ? '아르페지오' : '스케일'} ${keyName(no % 100)}`
 }
 
 /** 오늘의 조: 장조·관계 단조의 스케일과 아르페지오 4개 */
@@ -105,6 +133,7 @@ export function circleQueue(set: ScaleSet) {
 
 export function variationsFor(book: Book | 'free', no: number): readonly string[] {
   if (book !== 'scale') return VARIATIONS
+  if (scaleKind(no) >= 3) return ARPEGGIO_VARIATIONS.filter(v => v !== '속7화음' && v !== '감7화음')
   if (isArpeggio(no)) return ARPEGGIO_VARIATIONS
   return isMinor(no) ? [...MINOR_FORMS, ...SCALE_VARIATIONS] : SCALE_VARIATIONS
 }

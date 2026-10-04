@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { KEYS, bookItems, scaleQueue, type Book, type Key } from '../data/exercises'
+import { CHROMATIC, KEYS, bookItems, scaleNo, scaleQueue, type Book, type Key } from '../data/exercises'
 import { cardId, db, type Card, type Settings } from './db'
 import { againToday, doneToday, isDue, newSrs, schedule, type Rating, type Srs } from './srs'
 import { dateKey } from './time'
@@ -34,7 +34,13 @@ const keysFrom = (key: Key) => KEYS.map((_, i) => KEYS[(KEYS.indexOf(key) + i) %
 export function bookCards(book: Book, splits: number[], key: Key): { no: number; key?: Key }[] {
   if (book === 'hanon') return keysFrom(key).flatMap(k => bookItems('hanon', splits).map(it => ({ no: it.no, key: k })))
   if (book === 'pischna') return bookItems('pischna', splits).map(it => ({ no: it.no }))
-  return keysFrom(key).flatMap(k => scaleQueue(k).map(no => ({ no })))
+  // 24조 스케일·아르페지오(하농 39·41) 다음에 반음계(40), 속7화음(42), 감7화음(43)
+  const ks = keysFrom(key)
+  return [
+    ...ks.flatMap(k => scaleQueue(k).map(no => ({ no }))),
+    { no: CHROMATIC },
+    ...ks.flatMap(k => [{ no: scaleNo(3, KEYS.indexOf(k)) }, { no: scaleNo(4, KEYS.indexOf(k)) }])
+  ]
 }
 
 /** 오늘 할 카드 (Anki 순서): 오늘 이미 한 것 → 복습(하루 상한) → 새 카드(하루 한도) → 오늘 다시 */
