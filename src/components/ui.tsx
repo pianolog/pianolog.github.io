@@ -85,20 +85,40 @@ export function BpmStepper({ label, hint, value, onChange, accent }: { label: st
 
 // ── 토스트 ──
 
-const ToastCtx = createContext<(msg: string) => void>(() => {})
+export interface ToastAction {
+  label: string
+  run: () => void
+}
+
+const ToastCtx = createContext<(msg: string, action?: ToastAction) => void>(() => {})
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [msg, setMsg] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; action?: ToastAction } | null>(null)
   const timer = useRef<number>(0)
-  const show = useCallback((m: string) => {
-    setMsg(m)
+  const show = useCallback((text: string, action?: ToastAction) => {
+    setMsg({ text, action })
     clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setMsg(null), 2200)
+    timer.current = window.setTimeout(() => setMsg(null), action ? 5000 : 2200)
   }, [])
   return (
     <ToastCtx.Provider value={show}>
       {children}
-      {msg && <div className="toast">{msg}</div>}
+      {msg && (
+        <div className="toast">
+          {msg.text}
+          {msg.action && (
+            <button
+              className="toast-action"
+              onClick={() => {
+                msg.action!.run()
+                setMsg(null)
+              }}
+            >
+              {msg.action.label}
+            </button>
+          )}
+        </div>
+      )}
     </ToastCtx.Provider>
   )
 }

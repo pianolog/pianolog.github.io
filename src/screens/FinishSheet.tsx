@@ -3,6 +3,8 @@ import { HANDS, KEYS, type Hand, type Key } from '../data/exercises'
 import { Icon } from '../components/Icon'
 import { BpmStepper, Segmented, Sheet, SheetHead, Stars } from '../components/ui'
 import type { RefType } from '../lib/db'
+import { RatingButtons } from '../components/Rating'
+import type { Rating, Srs, SrsOpts } from '../lib/srs'
 import { clock } from '../lib/time'
 
 export interface FinishData {
@@ -13,6 +15,7 @@ export interface FinishData {
   variations: string[]
   rating: number
   memo: string
+  grade: Rating | null // 기초 카드 간격 복습 평가
 }
 
 export function FinishSheet({
@@ -23,6 +26,8 @@ export function FinishSheet({
   todayKey,
   nextLabel,
   variations,
+  srsFor,
+  srsOpts,
   onSave,
   onClose
 }: {
@@ -33,6 +38,8 @@ export function FinishSheet({
   todayKey?: Key
   nextLabel: string | null
   variations: readonly string[]
+  srsFor?: (key?: Key) => Srs // 기초 카드: 지금 고른 조의 카드
+  srsOpts?: SrsOpts
   onSave: (d: FinishData, next: boolean) => void
   onClose: () => void
 }) {
@@ -62,6 +69,16 @@ export function FinishSheet({
           <BpmStepper label="클린 BPM" hint={`자동 ${initial.cleanBpm}`} value={d.cleanBpm} onChange={cleanBpm => set({ cleanBpm })} accent />
         </div>
 
+        {srsFor && srsOpts && (!needKey || d.key) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+              <span className="sec-label">간격 복습</span>
+              <span style={{ fontSize: 12, color: 'var(--ink3)' }}>{needKey ? `${d.key} major 카드 · ` : ''}숫자는 다음 복습까지의 간격</span>
+            </div>
+            <RatingButtons compact srs={srsFor(d.key)} opts={srsOpts} value={d.grade} onChange={grade => set({ grade: d.grade === grade ? null : grade })} />
+          </div>
+        )}
+
         {(refType === 'hanon' || refType === 'pischna') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
@@ -78,15 +95,17 @@ export function FinishSheet({
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: srsFor ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1fr)', gap: 24 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span className="sec-label">손</span>
             <Segmented large value={d.hands} onChange={hands => set({ hands })} options={HANDS.map(h => ({ value: h, label: h }))} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="sec-label">자기평가</span>
-            <Stars value={d.rating} onChange={rating => set({ rating })} />
-          </div>
+          {!srsFor && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="sec-label">자기평가</span>
+              <Stars value={d.rating} onChange={rating => set({ rating })} />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

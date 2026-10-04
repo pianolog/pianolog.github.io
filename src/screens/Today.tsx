@@ -5,12 +5,14 @@ import { StatusIcon } from '../components/ui'
 import { useEntries, useRoutine, useSettings } from '../lib/hooks'
 import { nextKeyLabel, routineLabel, routineProgress, secondsOn, streak } from '../lib/stats'
 import { targetFor, useRoutineCtx } from '../lib/flow'
-import { ddayLabel, entryTitle, recommend, useRepData } from '../lib/repertoire'
+import { ddayLabel, entryTitle, recommendToday, useRepData } from '../lib/repertoire'
 import { TAG_STYLE } from './rep/PieceDetail'
 import { clock, dateKey, duration, longDate, parseDateKey, shortDate } from '../lib/time'
 import { useNav } from '../nav'
 import { RoutineEditor } from './RoutineEditor'
 import { KeySheet } from './KeySheet'
+import { SrsBar } from './SrsBar'
+import type { Book } from '../data/exercises'
 
 export function Today() {
   const nav = useNav()
@@ -31,11 +33,13 @@ export function Today() {
   const plannedMin = routine.reduce((a, r) => a + r.minutes, 0)
   const next = progress.find(p => p.status !== 'done' && targetFor(p, key))
   const rep = useRepData()
-  const picks = useMemo(() => recommend(rep.sections, rep.pieces, rep.ddays, rep.lessons, { limit: settings.dailyReviewMax, minutes: 60 }), [rep, settings.dailyReviewMax])
+  const picks = useMemo(() => recommendToday(rep, settings), [rep, settings])
   const pinned = rep.ddays.filter(d => d.pinned && d.date >= today).slice(0, 3)
   const lastLesson = rep.lessons[0]
   const lessonOpen = lastLesson?.items.filter(i => !i.resolved) ?? []
   const hasRepRoutine = routine.some(r => r.refType === 'rep')
+  const srsBooks = (['hanon', 'pischna', 'scale'] as Book[]).filter(b => !routine.some(r => r.srs && r.refType === b) && ctx.cards[b].some(c => c.srs || c.status === 'new'))
+  const anyCards = (['hanon', 'pischna', 'scale'] as Book[]).some(b => ctx.cards[b].some(c => c.srs))
 
   const start = () => {
     const t = next && targetFor(next, key)
@@ -153,6 +157,15 @@ export function Today() {
             <button className="btn" style={{ width: '100%', marginTop: 6 }} onClick={() => nav.startPractice({ refType: 'section', queue: picks.filter(p => !p.doneToday).map(p => p.section.id!) })} disabled={picks.every(p => p.doneToday)}>
               <PlayIcon size={18} /> 차례로 연습
             </button>
+          </div>
+        )}
+
+        {anyCards && srsBooks.length > 0 && (
+          <div className="card" style={{ padding: '18px 12px 8px' }}>
+            <div className="card-head" style={{ padding: '0 12px' }}>
+              <span className="t">기초 간격 복습<span className="sub">하루 한도 · 설정에서 바꿔요</span></span>
+            </div>
+            {srsBooks.map(b => <SrsBar key={b} plain book={b} items={ctx.cards[b]} />)}
           </div>
         )}
 

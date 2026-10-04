@@ -3,6 +3,8 @@ import { exerciseTitle, variationsFor, type Hand, type Key } from '../data/exerc
 import { Icon, PauseIcon, PlayIcon } from '../components/Icon'
 import { Sheet, SheetHead, useToast } from '../components/ui'
 import { db, type Entry } from '../lib/db'
+import { cardSrs, gradeCard, restoreCard, useCards } from '../lib/cards'
+import { RATING_LABEL, ivlLabel } from '../lib/srs'
 import { useEntries, useNow, useSettings, useWakeLock } from '../lib/hooks'
 import { metronome, useMetronome, type Subdivision } from '../lib/metronome'
 import { todayKey } from '../lib/stats'
@@ -27,6 +29,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
   const settings = useSettings()
   const entries = useEntries()
   const m = useMetronome()
+  const cards = useCards()
   const [target, setTarget] = useState(initialTarget)
   const [idx, setIdx] = useState(0)
   const [key, setKey] = useState<Key | undefined>(initialTarget.refType === 'hanon' ? initialTarget.key : undefined)
@@ -70,7 +73,13 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
   }, [sessionStart])
 
   // 항목이 바뀌면: 사다리·시작 BPM 불러오기, 타이머 초기화
-  const itemId = `${target.refType}:${no}:${target.refType === 'free' ? target.title : ''}`
+  const itemId = `${idx}:${target.refType}:${no}:${target.refType === 'free' ? target.title : ''}`
+
+  // 간격 복습 큐는 카드마다 조가 정해져 있다
+  const itemKey = target.refType !== 'free' ? target.keys?.[idx] : undefined
+  useEffect(() => {
+    if (itemKey) setKey(itemKey)
+  }, [itemKey, idx])
   useEffect(() => {
     let alive = true
     void db.settings.get(ladderKey(target, no)).then(r => {
@@ -125,7 +134,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
   const queueNext = target.refType !== 'free' && idx + 1 < target.queue.length ? target.queue[idx + 1] : null
   const nextLabel =
     queueNext !== null && target.refType !== 'free'
-      ? `${exerciseTitle(target.refType, queueNext)}${target.refType === 'hanon' && key ? ` · ${key} major` : ''}`
+      ? `${exerciseTitle(target.refType, queueNext)}${target.refType === 'hanon' && (target.keys?.[idx + 1] ?? key) ? ` · ${target.keys?.[idx + 1] ?? key} major` : ''}`
       : nextRoutine
         ? targetLabel(nextRoutine)
         : null
@@ -133,6 +142,7 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
 
   const save = async (d: FinishData, goNext: boolean) => {
     if (!sessionId) return
+    const graded = target.refType !== 'free' && d.grade ? await gradeCard(target.refType, no, target.refType === 'hanon' ? d.key : undefined, d.grade, settings) : null
     const entry: Entry = {
       sessionId,
       date: dateKey(),
@@ -147,18 +157,36 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
       hands: d.hands,
       variations: d.variations,
       rating: d.rating,
-      memo: d.memo.trim()
+      memo: d.memo.trim(),
+      grade: d.grade ?? undefined,
+      srsKind: graded?.kind
     }
-    await db.entries.add(entry)
+    const entryId = await db.entries.add(entry)
     await db.sessions.update(sessionId, { endedAt: Date.now() })
     lastHands.current = d.hands
     lastVars.current = d.variations
     if (d.key) setKey(d.key)
     setFinishing(false)
     autoPaused.current = false
-    toast(`${title} 저장됨`)
+    // '다시'는 오늘 큐 끝에 한 번 더
+    let t: BasicTarget = target
+    if (d.grade === 'again' && target.refType !== 'free') {
+      t = { ...target, queue: [...target.queue, no], keys: [...(target.keys ?? target.queue.map(() => undefined)), d.key] }
+      setTarget(t)
+    }
+    const requeue = t !== target
+    const undo = {
+      label: '되돌리기',
+      run: () => {
+        void db.entries.delete(entryId as number)
+        if (graded) void restoreCard(graded.id, graded.prev)
+        if (requeue) setTarget(x => (x.refType === 'free' ? x : { ...x, queue: x.queue.slice(0, -1), keys: x.keys?.slice(0, -1) }))
+      }
+    }
+    toast(graded ? (d.grade === 'again' ? `${title} · 오늘 끝에 한 번 더` : `${title} · ${RATING_LABEL[d.grade!]} · 다음 ${ivlLabel(graded.srs.ivl)}`) : `${title} 저장됨`, undo)
     if (!goNext) return onClose()
-    if (queueNext) setIdx(i => i + 1)
+    const hasNext = t.refType !== 'free' && idx + 1 < t.queue.length
+    if (hasNext) setIdx(i => i + 1)
     else if (nextRoutine?.refType === 'section') nav.startPractice(nextRoutine)
     else if (nextRoutine) {
       setTarget(nextRoutine)
@@ -330,7 +358,9 @@ export function PracticeMode({ target: initialTarget, onClose }: { target: Basic
           seconds={itemSec}
           todayKey={target.refType === 'hanon' ? todayKey(settings, entries) : undefined}
           variations={varList}
-          initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key: target.refType === 'scale' ? undefined : key, hands: lastHands.current, variations: lastVars.current.filter(v => varList.includes(v)), rating: 0, memo: '' }}
+          srsFor={target.refType === 'free' ? undefined : k => cardSrs(cards, target.refType as 'hanon', no, target.refType === 'hanon' ? k : undefined)}
+          srsOpts={{ maxIvl: settings.maxIvl, leechAt: settings.leechAt }}
+          initial={{ bpm: Math.max(maxBpm, m.bpm), cleanBpm: m.bpm, key: target.refType === 'scale' ? undefined : key, hands: lastHands.current, variations: lastVars.current.filter(v => varList.includes(v)), rating: 0, memo: '', grade: target.refType === 'free' ? null : 'good' }}
           nextLabel={nextLabel}
           onSave={save}
           onClose={cancelFinish}

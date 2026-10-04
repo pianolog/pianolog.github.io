@@ -6,6 +6,17 @@ import { useEntries, useSettings } from '../lib/hooks'
 import { coverage, exerciseStats, todayKey, weeklyBest } from '../lib/stats'
 import { agoLabel, clock, daysAgo, parseDateKey, shortDate } from '../lib/time'
 import { useNav } from '../nav'
+import { useCards } from '../lib/cards'
+import { cardId } from '../lib/db'
+import { dueLabel } from '../lib/repertoire'
+import type { Srs } from '../lib/srs'
+
+function srsText(c: Srs | undefined) {
+  if (!c) return null
+  if (c.suspended) return '쉬는 중'
+  if (c.state === 'new') return null
+  return dueLabel(c.due).text
+}
 
 function Chart({ data }: { data: { label: string; clean: number; reach: number }[] }) {
   const vals = data.flatMap(d => [d.clean, d.reach]).filter(Boolean)
@@ -50,7 +61,9 @@ export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
   const tKey = todayKey(settings, all)
   const map = book === 'hanon' ? settings.hanonBook : settings.pischnaBook
   const page = map.pages[no]
-  const sub = [book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음'].filter(Boolean).join(' · ')
+  const cards = useCards()
+  const own = book === 'pischna' ? cards.get(cardId('pischna', no)) : undefined
+  const sub = [book === 'hanon' && `${coverage(stat)}/12조`, stat?.best ? `최고 클린 ${stat.best}` : '기록 없음', own && srsText(own.srs) && `다음 복습 ${srsText(own.srs)}`, own?.srs.leech && '고질'].filter(Boolean).join(' · ')
 
   const openScore = () => {
     if (!map.scoreId) return toast(`설정에서 ${BOOK_NAME[book]} 악보 PDF를 연결하세요`)
@@ -84,7 +97,7 @@ export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
         {book === 'hanon' && (
           <div className="card" style={{ padding: '16px 18px 18px' }}>
             <div className="card-head" style={{ marginBottom: 12 }}>
-              <span style={{ fontSize: 17, fontWeight: 600 }}>12조<span className="sub" style={{ fontSize: 13 }}>5도권 순서 · 최고 클린 BPM · 마지막 연습</span></span>
+              <span style={{ fontSize: 17, fontWeight: 600 }}>12조<span className="sub" style={{ fontSize: 13 }}>5도권 순서 · 최고 클린 BPM · 마지막 연습 · 오른쪽 위는 다음 복습</span></span>
               <div style={{ display: 'flex', gap: 14, fontSize: 13, color: 'var(--ink2)' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 3, border: '1.5px solid var(--alert)' }} />21일+</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 3, border: '1.5px solid var(--accent)' }} />오늘의 조</span>
@@ -95,6 +108,8 @@ export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
                 const ks = stat?.keys[k]
                 const stale = ks?.last ? daysAgo(ks.last) >= 21 : false
                 const isToday = k === tKey
+                const card = cards.get(cardId('hanon', no, k))
+                const next = srsText(card?.srs)
                 return (
                   <button
                     key={k}
@@ -102,7 +117,10 @@ export function ExerciseDetail({ book, no }: { book: ScoreBook; no: number }) {
                     onClick={() => nav.startPractice({ refType: 'hanon', queue: [no], key: k })}
                     style={{ height: 98, borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', textAlign: 'left', background: ks ? 'var(--s2)' : 'transparent', border: `1.5px ${ks ? 'solid' : 'dashed'} ${stale ? 'var(--alert)' : isToday ? 'var(--accent)' : ks ? 'transparent' : 'var(--line)'}` }}
                   >
-                    <span className="serif" style={{ fontSize: 19, fontWeight: 600, color: ks ? undefined : 'var(--ink3)' }}>{k}</span>
+                    <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 4 }}>
+                      <span className="serif" style={{ fontSize: 19, fontWeight: 600, color: ks ? undefined : 'var(--ink3)' }}>{k}</span>
+                      {next && <span style={{ fontSize: 11, fontWeight: 600, color: card?.srs.leech ? 'var(--alert)' : next === '오늘' || next.endsWith('지남') ? 'var(--accentText)' : 'var(--ink3)', whiteSpace: 'nowrap' }}>{next}</span>}
+                    </span>
                     <span style={{ fontSize: 26, fontWeight: 600, lineHeight: 1, color: ks ? undefined : 'var(--ink3)' }}>{ks?.best ?? '—'}</span>
                     <span style={{ fontSize: 12, fontWeight: stale || isToday ? 600 : 400, color: stale ? 'var(--alert)' : isToday ? 'var(--accentText)' : 'var(--ink3)' }}>{isToday && !ks?.last ? '오늘의 조' : agoLabel(ks?.last)}</span>
                   </button>

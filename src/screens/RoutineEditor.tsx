@@ -43,7 +43,8 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
   }
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState(15)
-  const [scaleMode, setScaleMode] = useState(0)
+  const [scaleMode, setScaleMode] = useState(0) // 0 오늘의 조, 1 5도권 묶음, 2 간격 복습
+  const [srs, setSrs] = useState(false) // 하농·피쉬나: 범위 대신 간격 복습
   const [circle, setCircle] = useState(false)
 
   const valid = type === 'free' ? title.trim().length > 0 : type === 'scale' || type === 'rep' ? true : to >= from
@@ -51,8 +52,9 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
   const add = async () => {
     if (!valid) return
     const order = routine.length ? Math.max(...routine.map(r => r.order)) + 1 : 0
-    const ranged = type === 'hanon' || type === 'pischna'
-    await db.routine.add({ order, refType: type, from: ranged ? from : type === 'scale' ? scaleMode : 0, to: ranged ? to : 0, title: type === 'free' ? title.trim() : '', minutes: minutes || 5 })
+    const ranged = (type === 'hanon' || type === 'pischna') && !srs
+    const useSrs = ((type === 'hanon' || type === 'pischna') && srs) || (type === 'scale' && scaleMode === 2)
+    await db.routine.add({ order, refType: type, from: ranged ? from : type === 'scale' && !useSrs ? scaleMode : 0, to: ranged ? to : 0, title: type === 'free' ? title.trim() : '', minutes: minutes || 5, srs: useSrs || undefined })
     setTitle('')
   }
 
@@ -103,12 +105,18 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
             <input className="field" placeholder="예) 쇼팽 에튀드 Op.10 No.4" value={title} onChange={e => setTitle(e.target.value)} style={{ flex: 1, minWidth: 240, background: 'var(--s1)' }} />
           ) : type === 'scale' ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <Segmented value={scaleMode} onChange={setScaleMode} options={[{ value: 0, label: '오늘의 조 4개' }, { value: 1, label: '5도권 묶음' }]} />
+              <Segmented value={scaleMode} onChange={setScaleMode} options={[{ value: 0, label: '오늘의 조 4개' }, { value: 1, label: '5도권 묶음' }, { value: 2, label: '간격 복습' }]} />
+              {scaleMode === 2 && <span className="caption">복습할 조 + 새 조 (하루 한도)</span>}
               {scaleMode === 1 && <button className="link" onClick={() => setCircle(true)}>묶음 편집 ({circleQueue(settings.scaleSet).length}항목)</button>}
             </div>
           ) : type === 'rep' ? (
             <span style={{ flex: 1, fontSize: 15, color: 'var(--ink2)' }}>앱이 고른 오늘 할 구간 (복습일·취약·레슨 지적·D-day 기준)</span>
           ) : (
+            <>
+              <Segmented value={srs ? 1 : 0} onChange={v => setSrs(v === 1)} options={[{ value: 0, label: '번호 범위' }, { value: 1, label: '간격 복습' }]} />
+              {srs ? (
+                <span className="caption">{type === 'hanon' ? '복습할 번호×조 + 새 카드 (하루 한도)' : '복습할 번호 + 새 번호 (하루 한도)'}</span>
+              ) : (
             <>
               <select className="field" value={from} onChange={e => { const n = Number(e.target.value); setFrom(n); if (n > to) setTo(n) }} style={selectStyle}>
                 {items.map(it => <option key={it.no} value={it.no}>{it.label}</option>)}
@@ -118,6 +126,8 @@ export function RoutineEditor({ onClose }: { onClose: () => void }) {
                 {items.filter(it => it.no >= from).map(it => <option key={it.no} value={it.no}>{it.label}</option>)}
               </select>
               <span style={{ color: 'var(--ink3)' }}>번까지</span>
+            </>
+              )}
             </>
           )}
           <span style={{ marginLeft: type === 'hanon' || type === 'pischna' ? 'auto' : 0 }} />

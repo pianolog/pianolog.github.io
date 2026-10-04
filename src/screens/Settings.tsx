@@ -70,14 +70,35 @@ export function SettingsPage() {
               ))}
             </div>
           )}
-          <Row label="하루 복습 구간" sub="오늘 할 구간 추천 최대 개수">
-            <Segmented value={s.dailyReviewMax} onChange={v => saveSetting('dailyReviewMax', v)} options={[4, 6, 8, 10].map(n => ({ value: n, label: `${n}개` }))} />
-          </Row>
           <Row label="템포 사다리 간격">
             <Segmented value={s.ladderStep} onChange={v => saveSetting('ladderStep', v)} options={[2, 4, 6, 8].map(n => ({ value: n, label: `+${n}` }))} />
           </Row>
           <Row label="테마">
             <Segmented value={s.theme} onChange={v => saveSetting('theme', v)} options={[{ value: 'system', label: '시스템' }, { value: 'dark', label: '다크' }, { value: 'light', label: '라이트' }]} />
+          </Row>
+        </div>
+
+        <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <div className="card-head" style={{ paddingTop: 14 }}>
+            <span className="t">간격 복습<span className="sub">Anki 방식 · 다시 / 어려움 / 됨 / 쉬움</span></span>
+          </div>
+          <Row label="레퍼토리 하루 복습" sub="오늘 할 구간 중 복습 최대 개수">
+            <Segmented value={s.dailyReviewMax} onChange={v => saveSetting('dailyReviewMax', v)} options={[4, 6, 8, 10, 15].map(n => ({ value: n, label: `${n}개` }))} />
+          </Row>
+          <Row label="레퍼토리 하루 새 구간" sub="처음 연습하는 구간">
+            <Segmented value={s.repNewPerDay} onChange={v => saveSetting('repNewPerDay', v)} options={[0, 1, 2, 3, 5].map(n => ({ value: n, label: `${n}개` }))} />
+          </Row>
+          <Row label="기초 하루 복습" sub="하농·피쉬나·스케일 책마다">
+            <Segmented value={s.cardReviewMax} onChange={v => saveSetting('cardReviewMax', v)} options={[5, 10, 15, 20].map(n => ({ value: n, label: `${n}개` }))} />
+          </Row>
+          <Row label="기초 하루 새 카드" sub="책마다 · 하농은 번호×조가 카드 하나">
+            <Segmented value={s.cardNewPerDay} onChange={v => saveSetting('cardNewPerDay', v)} options={[0, 1, 2, 3, 5].map(n => ({ value: n, label: `${n}개` }))} />
+          </Row>
+          <Row label="최대 간격" sub="잘 되는 것도 이 기간 안에는 다시 나와요">
+            <Segmented value={s.maxIvl} onChange={v => saveSetting('maxIvl', v)} options={[30, 60, 90, 180].map(n => ({ value: n, label: `${n}일` }))} />
+          </Row>
+          <Row label="고질 기준" sub="복습 중 '다시'를 이만큼 누르면 고질로 표시">
+            <Segmented value={s.leechAt} onChange={v => saveSetting('leechAt', v)} options={[4, 6, 8].map(n => ({ value: n, label: `${n}번` }))} />
           </Row>
         </div>
 

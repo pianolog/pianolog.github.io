@@ -1,10 +1,11 @@
-import { db } from './db'
+import { db, migrateSection } from './db'
+import { migrateGrade } from './srs'
 import { dateKey } from './time'
 
 // 기록 백업 (JSON). 악보 PDF와 런스루 녹음은 용량이 커서 제외한다.
 
-const VERSION = 2
-const REP_TABLES = ['lists', 'pieces', 'sections', 'runs', 'ddays', 'lessons'] as const
+const VERSION = 3
+const REP_TABLES = ['lists', 'pieces', 'sections', 'runs', 'ddays', 'lessons', 'cards'] as const
 
 export async function exportBackup() {
   const [sessions, entries, routine, settings, scores, ...rep] = await Promise.all([
@@ -53,7 +54,9 @@ export async function importBackup(file: File) {
   await db.transaction('rw', [db.sessions, db.entries, db.routine, db.settings, ...REP_TABLES.map(t => db.table(t))], async () => {
     await Promise.all([db.sessions.clear(), db.entries.clear(), db.routine.clear()])
     await db.sessions.bulkAdd(data.sessions ?? [])
-    await db.entries.bulkAdd(data.entries ?? [])
+    // 옛 백업(v2)의 3단계 평가와 구간 복습 필드를 새 형식으로
+    await db.entries.bulkAdd((data.entries ?? []).map((e: { grade?: unknown }) => (e.grade ? { ...e, grade: migrateGrade(e.grade) } : e)))
+    for (const s of data.sections ?? []) migrateSection(s)
     await db.routine.bulkAdd(data.routine ?? [])
     for (const t of REP_TABLES) {
       if (!data[t]) continue

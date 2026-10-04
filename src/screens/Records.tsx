@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Icon } from '../components/Icon'
 import { Segmented, useToast } from '../components/ui'
 import { Lessons } from './rep/Lessons'
+import { ReviewStats } from './ReviewStats'
+import { RATING_LABEL } from '../lib/srs'
 import { db } from '../lib/db'
 import { useEntries } from '../lib/hooks'
 import { secondsByDay } from '../lib/stats'
@@ -20,7 +22,7 @@ function heatColor(sec: number) {
 export function Records() {
   const entries = useEntries()
   const toast = useToast()
-  const [view, setView] = useState<'cal' | 'lesson'>('cal')
+  const [view, setView] = useState<'cal' | 'review' | 'lesson'>('cal')
   const byDay = useMemo(() => secondsByDay(entries), [entries])
   const [sel, setSel] = useState(dateKey())
 
@@ -53,10 +55,12 @@ export function Records() {
       <div className="screen-inner">
         <div className="page-head">
           <h1 className="page-title">기록</h1>
-          <Segmented value={view} onChange={setView} options={[{ value: 'cal', label: '연습 기록' }, { value: 'lesson', label: '레슨노트' }]} />
+          <Segmented value={view} onChange={setView} options={[{ value: 'cal', label: '연습 기록' }, { value: 'review', label: '복습' }, { value: 'lesson', label: '레슨노트' }]} />
         </div>
         {view === 'lesson' ? (
           <Lessons />
+        ) : view === 'review' ? (
+          <ReviewStats />
         ) : (
           <>
 
@@ -115,7 +119,7 @@ export function Records() {
                   {e.key && <span className="serif" style={{ marginLeft: 8, color: 'var(--ink2)' }}>{e.key}</span>}
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {[`클린 ${e.cleanBpm} · 도달 ${e.bpm}`, e.hands, ...e.variations, e.rating ? '★'.repeat(e.rating) : '', e.memo].filter(Boolean).join(' · ')}
+                  {[`클린 ${e.cleanBpm} · 도달 ${e.bpm}`, e.hands, ...e.variations, e.rating ? '★'.repeat(e.rating) : '', e.grade ? RATING_LABEL[e.grade] : '', e.memo].filter(Boolean).join(' · ')}
                 </span>
               </div>
               <span style={{ color: 'var(--ink2)' }}>{clock(e.seconds)}</span>

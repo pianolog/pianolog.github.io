@@ -166,7 +166,8 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .full { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; flex-direction: column; padding-top: var(--safe-t); }
 
 .empty { text-align: center; padding: 40px 20px; color: var(--ink3); font-size: 15px; line-height: 1.6; }
-.toast { position: fixed; left: 50%; top: calc(20px + var(--safe-t)); transform: translateX(-50%); z-index: 60; background: var(--ink); color: var(--bg); padding: 12px 20px; border-radius: 99px; font-size: 15px; font-weight: 600; animation: rise 0.2s ease-out; white-space: nowrap; }
+.toast-action { margin-left: 14px; color: var(--accent); font-weight: 700; font-size: 15px; padding: 4px 2px; }
+.toast { display: flex; align-items: center; position: fixed; left: 50%; top: calc(20px + var(--safe-t)); transform: translateX(-50%); z-index: 60; background: var(--ink); color: var(--bg); padding: 12px 20px; border-radius: 99px; font-size: 15px; font-weight: 600; animation: rise 0.2s ease-out; white-space: nowrap; }
 
 @media (max-width: 760px) {
   :root { --pad: 20px; }

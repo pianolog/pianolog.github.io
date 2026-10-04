@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Icon, PauseIcon, PlayIcon } from '../../components/Icon'
 import { Sheet, SheetHead, useToast } from '../../components/ui'
-import { db, type Grade, type Lesson, type Section } from '../../lib/db'
+import { db, type Lesson, type Section } from '../../lib/db'
 import { nextRoutineTarget } from '../../lib/flow'
 import { useNow, useSettings, useWakeLock } from '../../lib/hooks'
 import { metronome, useMetronome } from '../../lib/metronome'
-import { nextInterval, openLessons, scheduleAfter, STAGES } from '../../lib/repertoire'
-import { addDays, clock, dateKey, parseDateKey } from '../../lib/time'
+import { openLessons, scheduleAfter, sectionOpts, STAGES } from '../../lib/repertoire'
+import { RATING_LABEL, ivlLabel, type Rating, type SrsOpts } from '../../lib/srs'
+import { clock, dateKey, parseDateKey } from '../../lib/time'
+import { RatingButtons } from '../../components/Rating'
 import { useNav, type PracticeTarget } from '../../nav'
 import { ScoreScreen } from '../ScoreScreen'
 
@@ -17,12 +19,14 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
   const settings = useSettings()
   const m = useMetronome()
   const [idx, setIdx] = useState(0)
-  const sectionId = target.queue[idx]
+  // '다시'를 누른 구간은 오늘 큐 끝에 다시 붙는다
+  const [queue, setQueue] = useState(target.queue)
+  const sectionId = queue[idx]
   const data = useLiveQuery(async () => {
     const section = await db.sections.get(sectionId)
     const piece = section ? await db.pieces.get(section.pieceId) : undefined
-    const lessons = await db.lessons.toArray()
-    return { section, piece, lessons }
+    const [lessons, ddays] = await Promise.all([db.lessons.toArray(), db.ddays.toArray()])
+    return { section, piece, lessons, ddays }
   }, [sectionId])
   const section = data?.section
   const piece = data?.piece
@@ -62,10 +66,10 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
   }, [sessionStart])
 
   // 구간이 바뀌면 사다리 BPM에서 다시 시작
-  const loadedFor = useRef<number | null>(null)
+  const loadedFor = useRef<string | null>(null)
   useEffect(() => {
-    if (!section || loadedFor.current === section.id) return
-    loadedFor.current = section.id!
+    if (!section || loadedFor.current === `${idx}:${section.id}`) return
+    loadedFor.current = `${idx}:${section.id}`
     metronome.setBpm(section.bpm)
     setItemStart(Date.now())
     setPausedAt(null)
@@ -75,7 +79,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     setOks(0)
     setReached(section.bpm)
     setFlash('')
-  }, [section])
+  }, [section, idx])
 
   const steps = useMemo(() => {
     if (!section) return []
@@ -123,9 +127,12 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     toast('해결로 표시했어요')
   }
 
-  const save = async (grade: Grade, memo: string, goNext: boolean) => {
+  const opts = sectionOpts(settings, piece.id!, data!.ddays)
+
+  const save = async (grade: Rating, memo: string, goNext: boolean) => {
     if (!sessionId) return
-    await db.entries.add({
+    const prev = section
+    const entryId = await db.entries.add({
       sessionId,
       date: dateKey(),
       createdAt: Date.now(),
@@ -142,15 +149,26 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
       memo: memo.trim(),
       attempts: tries,
       successes: oks,
-      grade
+      grade,
+      srsKind: section.srs.state === 'new' ? 'new' : section.srs.state === 'review' ? 'review' : 'learn'
     })
-    await db.sections.update(section.id!, { bpm: Math.min(m.bpm, section.targetBpm), ...scheduleAfter(section, grade) })
+    const sched = scheduleAfter(section, grade, opts)
+    await db.sections.update(section.id!, { bpm: Math.min(m.bpm, section.targetBpm), ...sched })
     await db.sessions.update(sessionId, { endedAt: Date.now() })
     setFinishing(false)
     metronome.stop()
-    toast(`${section.label} 저장됨`)
+    const q = grade === 'again' ? [...queue, section.id!] : queue
+    setQueue(q)
+    toast(grade === 'again' ? `${section.label} · 오늘 끝에 한 번 더` : `${section.label} · ${RATING_LABEL[grade]} · 다음 ${ivlLabel(sched.srs!.ivl)}`, {
+      label: '되돌리기',
+      run: () => {
+        void db.entries.delete(entryId as number)
+        void db.sections.update(prev.id!, { bpm: prev.bpm, srs: prev.srs, weak: prev.weak })
+        if (grade === 'again') setQueue(x => x.slice(0, -1))
+      }
+    })
     if (!goNext) return onClose()
-    if (idx + 1 < target.queue.length) return setIdx(i => i + 1)
+    if (idx + 1 < q.length) return setIdx(i => i + 1)
     const next = target.routineId ? await nextRoutineTarget(target.routineId) : null
     if (next && next.refType !== 'section') nav.startPractice(next)
     else onClose()
@@ -161,7 +179,7 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
     onClose()
   }
 
-  const nextLabel = idx + 1 < target.queue.length ? '다음 구간' : target.routineId ? '루틴 다음 항목' : null
+  const nextLabel = idx + 1 < queue.length ? '다음 구간' : target.routineId ? '루틴 다음 항목' : null
   const rate = tries ? Math.round((oks / tries) * 100) : 0
 
   return (
@@ -176,7 +194,8 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
               {piece.title} · {section.label}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {target.queue.length > 1 && <span className="chip">오늘 구간 {idx + 1} / {target.queue.length}</span>}
+              {queue.length > 1 && <span className="chip">오늘 구간 {idx + 1} / {queue.length}</span>}
+              {queue.indexOf(section.id!) < idx && <span className="chip" style={{ color: 'var(--alert)' }}>오늘 다시</span>}
               <span className="chip">{STAGES[section.stage]} 단계</span>
             </div>
           </div>
@@ -270,7 +289,8 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
           section={section}
           pieceTitle={piece.title}
           stats={{ tries, rate, reached: Math.max(reached, m.bpm), start: section.bpm, seconds: itemSec }}
-          queueText={target.queue.length > 1 ? `오늘 구간 ${idx + 1} / ${target.queue.length}` : ''}
+          queueText={queue.length > 1 ? `오늘 구간 ${idx + 1} / ${queue.length}` : ''}
+          opts={opts}
           lessons={lessonsOpen}
           onResolve={resolve}
           nextLabel={nextLabel}
@@ -283,17 +303,12 @@ export function SectionPractice({ target, onClose }: { target: Extract<PracticeT
   )
 }
 
-const GRADES: { g: Grade; label: string }[] = [
-  { g: 'bad', label: '안 됨' },
-  { g: 'unsure', label: '애매' },
-  { g: 'good', label: '됨' }
-]
-
 function SectionFinishSheet({
   section,
   pieceTitle,
   stats,
   queueText,
+  opts,
   lessons,
   onResolve,
   nextLabel,
@@ -304,21 +319,16 @@ function SectionFinishSheet({
   pieceTitle: string
   stats: { tries: number; rate: number; reached: number; start: number; seconds: number }
   queueText: string
+  opts: SrsOpts
   lessons: ReturnType<typeof openLessons>
   onResolve: (l: Lesson, id: string) => void
   nextLabel: string | null
-  onSave: (g: Grade, memo: string, next: boolean) => void
+  onSave: (g: Rating, memo: string, next: boolean) => void
   onClose: () => void
 }) {
-  const [grade, setGrade] = useState<Grade>('good')
+  const [grade, setGrade] = useState<Rating>(stats.tries && stats.rate < 50 ? 'hard' : 'good')
   const [memo, setMemo] = useState('')
   const tile = { background: 'var(--bg)', borderRadius: 16, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 } as const
-  const preview = (g: Grade) => {
-    const days = nextInterval(g, section.intervalDays)
-    const d = addDays(new Date(), days)
-    const what = g === 'bad' ? '간격 1일로' : g === 'unsure' ? '간격 유지' : '간격 늘림'
-    return { next: days === 1 ? '내일' : `${days}일 뒤`, date: `${d.getMonth() + 1}월 ${d.getDate()}일 · ${what}` }
-  }
   return (
     <Sheet onClose={onClose}>
       <SheetHead title="구간 끝내기" sub={[pieceTitle, section.label, queueText].filter(Boolean).join(' · ')} onClose={onClose} />
@@ -337,20 +347,10 @@ function SectionFinishSheet({
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginTop: 28 }}>
         <span className="sec-label">오늘 이 구간은</span>
-        <span style={{ fontSize: 12, color: 'var(--ink3)' }}>평가에 따라 다음 복습일이 정해져요</span>
+        <span style={{ fontSize: 12, color: 'var(--ink3)' }}>버튼 아래 숫자가 다음 복습까지의 간격이에요{opts.cap ? ` · D-day 때문에 최대 ${ivlLabel(opts.cap)}` : ''}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10, marginTop: 10 }}>
-        {GRADES.map(({ g, label }) => {
-          const on = grade === g
-          const p = preview(g)
-          return (
-            <button key={g} className="tap" onClick={() => setGrade(g)} style={{ height: 132, borderRadius: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, background: on ? 'color-mix(in oklch, var(--accent) 22%, var(--s1))' : 'var(--bg)', border: `2px solid ${on ? 'var(--accent)' : 'transparent'}` }}>
-              <span style={{ fontSize: 24, fontWeight: 700 }}>{label}</span>
-              <span style={{ fontSize: 16, fontWeight: 600, color: on ? 'var(--accentText)' : 'var(--ink2)' }}>{p.next}</span>
-              <span style={{ fontSize: 12, color: 'var(--ink3)' }}>{p.date}</span>
-            </button>
-          )
-        })}
+      <div style={{ marginTop: 10 }}>
+        <RatingButtons srs={section.srs} opts={opts} value={grade} onChange={setGrade} />
       </div>
 
       {lessons.map(l => (

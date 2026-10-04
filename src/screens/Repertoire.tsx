@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '../components/Icon'
 import type { DDay, RepList } from '../lib/db'
 import { ddayLabel, pieceName, STAGES, useRepData } from '../lib/repertoire'
+import { isDue } from '../lib/srs'
 import { dateKey, parseDateKey, shortDate } from '../lib/time'
 import { useNav } from '../nav'
 import { DdaySheet, Dot, ListSheet, PieceSheet } from './rep/RepSheets'
@@ -80,7 +81,7 @@ export function Repertoire() {
 
         {shown.map(p => {
           const secs = sections.filter(s => s.pieceId === p.id)
-          const due = secs.filter(s => s.dueDate <= today).length
+          const due = secs.filter(s => isDue(s.srs, today)).length
           const weak = secs.filter(s => s.weak).length
           const done = secs.filter(s => s.stage === 5).length
           const d = upcoming.find(x => x.pieceIds.includes(p.id!))

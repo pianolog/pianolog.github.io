@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Icon, PlayIcon } from '../../components/Icon'
 import { useToast } from '../../components/ui'
 import { db, type Section } from '../../lib/db'
-import { ddayLabel, dueLabel, openLessons, recommend, STAGES, useRepData, type Tag } from '../../lib/repertoire'
+import { ddayLabel, openLessons, recommend, sectionDue, STAGES, useRepData, type Tag } from '../../lib/repertoire'
 import { clock, dateKey, parseDateKey, shortDate } from '../../lib/time'
 import { useNav } from '../../nav'
 import { ScorePicker } from '../ScorePicker'
@@ -30,7 +30,7 @@ export function PieceDetail({ pieceId }: { pieceId: number }) {
   if (!piece) return <div className="screen"><div className="screen-inner"><button className="back" onClick={nav.closePage}><Icon name="left" size={20} />레퍼토리</button></div></div>
 
   const secs = sections.filter(s => s.pieceId === pieceId)
-  const picks = recommend(sections, pieces, ddays, lessons, { limit: 4, minutes: 40, pieceId })
+  const picks = recommend(sections, pieces, ddays, lessons, { limit: 4, newMax: 2, minutes: 40, pieceId })
   const total = picks.reduce((a, p) => a + p.minutes, 0)
   const d = ddays.find(x => x.pieceIds.includes(pieceId) && x.date >= dateKey())
   const pieceLists = piece.listIds.map(id => lists.find(l => l.id === id)).filter(Boolean)
@@ -122,13 +122,14 @@ export function PieceDetail({ pieceId }: { pieceId: number }) {
           )}
           {secs.length === 0 && <div className="empty" style={{ padding: 18 }}>마디 단위로 구간을 만들어 두세요. (예: m.1–16)</div>}
           {secs.map(s => {
-            const due = dueLabel(s.dueDate)
+            const due = sectionDue(s)
             const nLesson = openLessons(lessons, s.id!).length
             return (
               <button key={s.id} onClick={() => setSec(s)} style={{ width: '100%', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 170px 92px 84px', gap: 12, alignItems: 'center', minHeight: 54, borderBottom: '1px solid var(--line)', textAlign: 'left' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span className="serif" style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</span>
+                    {s.srs.leech && <span style={{ ...TAG_STYLE.weak, fontSize: 11, padding: '1px 6px' }}>고질</span>}
                     {s.weak && <span style={{ ...TAG_STYLE.weak, fontSize: 11, padding: '1px 6px' }}>취약</span>}
                     {nLesson > 0 && <span style={{ ...TAG_STYLE.lesson, fontSize: 11, padding: '1px 6px' }}>레슨 {nLesson}</span>}
                   </div>

@@ -1,5 +1,6 @@
 import { KEYS, bookItems, circleQueue, pischnaLabel, relativeMinor, scaleQueue, type Book, type Key, type ScaleSet } from '../data/exercises'
 import type { Entry, RoutineItem, Settings } from './db'
+import type { CardItem } from './cards'
 import { addDays, dateKey, dayIndex } from './time'
 
 export function secondsOn(entries: Entry[], day: string) {
@@ -114,11 +115,14 @@ export interface RoutineCtx {
   splits: number[] // 피쉬나 a·b 번호
   key: Key // 오늘의 조
   repQueue: number[] // 레퍼토리 오늘 할 구간 id
+  repDone: number[] // 그중 오늘 끝낸 구간 ('다시'는 아직 안 끝난 것)
   scaleSet: ScaleSet // 저장한 5도권 묶음
+  cards: Record<Book, CardItem[]> // 기초 간격 복습: 오늘 할 카드
 }
 
 export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
   if (item.refType === 'free') return []
+  if (item.srs && item.refType !== 'rep') return ctx.cards[item.refType].map(c => c.no)
   if (item.refType === 'scale') return item.from === 1 ? circleQueue(ctx.scaleSet) : scaleQueue(ctx.key)
   if (item.refType === 'rep') return ctx.repQueue
   return bookItems(item.refType, ctx.splits)
@@ -129,6 +133,7 @@ export function routineNumbers(item: RoutineItem, ctx: RoutineCtx) {
 export function routineLabel(item: RoutineItem, key?: Key) {
   if (item.refType === 'free') return item.title
   if (item.refType === 'rep') return '레퍼토리 · 오늘 할 구간'
+  if (item.srs) return `${item.refType === 'hanon' ? '하농' : item.refType === 'pischna' ? '피쉬나' : '스케일·아르페지오'} · 간격 복습`
   if (item.refType === 'scale' && item.from === 1) return '스케일·아르페지오 · 5도권 묶음'
   if (item.refType === 'scale') return key ? `스케일·아르페지오 · ${key} / ${relativeMinor(key)}` : '스케일·아르페지오 (오늘의 조)'
   const lab = item.refType === 'pischna' ? pischnaLabel : String
@@ -145,6 +150,7 @@ export interface RoutineProgress {
   seconds: number
   status: 'done' | 'prog' | 'pend'
   nextNo: number | null // 다음에 칠 번호
+  pending?: CardItem[] // 간격 복습: 아직 안 한 카드
 }
 
 export function routineProgress(item: RoutineItem, todayEntries: Entry[], ctx: RoutineCtx): RoutineProgress {
@@ -154,9 +160,27 @@ export function routineProgress(item: RoutineItem, todayEntries: Entry[], ctx: R
     const status = seconds >= item.minutes * 60 ? 'done' : seconds > 0 ? 'prog' : 'pend'
     return { item, nums: [], done: mine.length ? 1 : 0, total: 1, seconds, status, nextNo: null }
   }
+  if (item.srs && item.refType !== 'rep') {
+    const items = ctx.cards[item.refType]
+    const pending = items.filter(c => c.status !== 'done')
+    const mine = todayEntries.filter(e => e.refType === item.refType && e.grade && items.some(c => c.no === e.refNo && (!c.key || c.key === e.key)))
+    const seconds = mine.reduce((a, e) => a + e.seconds, 0)
+    const done = items.length - pending.length
+    const status = !items.length || !pending.length ? 'done' : done > 0 ? 'prog' : 'pend'
+    return { item, nums: items.map(c => c.no), done, total: items.length, seconds, status, nextNo: pending[0]?.no ?? null, pending }
+  }
+  if (item.refType === 'rep') {
+    const nums = ctx.repQueue
+    const doneSet = new Set(ctx.repDone)
+    const mine = todayEntries.filter(e => e.refType === 'section' && nums.includes(e.refNo))
+    const seconds = mine.reduce((a, e) => a + e.seconds, 0)
+    const done = nums.filter(n => doneSet.has(n)).length
+    const nextNo = nums.find(n => !doneSet.has(n)) ?? null
+    const status = nums.length && nextNo === null ? 'done' : done > 0 ? 'prog' : 'pend'
+    return { item, nums, done, total: nums.length, seconds, status, nextNo }
+  }
   const nums = routineNumbers(item, ctx)
-  const refType = item.refType === 'rep' ? 'section' : item.refType
-  const mine = todayEntries.filter(e => e.refType === refType && nums.includes(e.refNo))
+  const mine = todayEntries.filter(e => e.refType === item.refType && nums.includes(e.refNo))
   const doneSet = new Set(mine.map(e => e.refNo))
   const seconds = mine.reduce((a, e) => a + e.seconds, 0)
   const done = doneSet.size

@@ -77,7 +77,10 @@ export function RunReview({ runId }: { runId: number }) {
     const today = dateKey()
     await db.transaction('rw', db.runs, db.sections, async () => {
       await db.runs.update(runId, { reviewed: true, marks: run.marks.map((m, i) => ({ ...m, sectionId: picked[i] === undefined ? undefined : picked[i] === NONE ? null : picked[i] })) })
-      for (const id of chosen) await db.sections.update(id, { weak: true, dueDate: today, intervalDays: 1 })
+      for (const id of chosen) {
+        const s = await db.sections.get(id)
+        if (s) await db.sections.update(id, { weak: true, srs: { ...s.srs, due: today } })
+      }
     })
     toast(chosen.length ? `${chosen.length}개 구간을 취약으로 표시했어요` : '저장됨')
     nav.openPage({ kind: 'piece', pieceId: run.pieceId })

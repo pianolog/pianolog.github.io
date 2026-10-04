@@ -7,6 +7,8 @@ import { coverage, exerciseStats, todayKey, type ExerciseStat } from '../lib/sta
 import { agoLabel, daysAgo } from '../lib/time'
 import { useNav } from '../nav'
 import { KeySheet } from './KeySheet'
+import { SrsBar } from './SrsBar'
+import { cardQueue, useCards } from '../lib/cards'
 import { CircleSheet } from './CircleSheet'
 
 const MIX = [0, 16, 32, 50, 72, 100]
@@ -144,6 +146,8 @@ export function Basics() {
   const stats = useMemo(() => (book === 'scale' ? new Map<number, ExerciseStat>() : exerciseStats(entries, book)), [entries, book])
   const key = todayKey(settings, entries)
   const items = book === 'scale' ? [] : bookItems(book, settings.pischnaSplits)
+  const cards = useCards()
+  const due = useMemo(() => cardQueue(book, cards, { splits: settings.pischnaSplits, key, settings }), [book, cards, settings, key])
 
   return (
     <div className="screen">
@@ -153,6 +157,10 @@ export function Basics() {
           <div style={{ marginLeft: 'auto' }}>
             <Segmented value={book} onChange={setBook} options={[{ value: 'hanon', label: '하농' }, { value: 'pischna', label: '피쉬나' }, { value: 'scale', label: '스케일·아르페지오' }]} />
           </div>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SrsBar book={book} items={due} />
         </div>
 
         {book === 'scale' ? (

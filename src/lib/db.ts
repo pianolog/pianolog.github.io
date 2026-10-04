@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Book, Hand, Key, ScaleSet } from '../data/exercises'
+import { migrateGrade, migrateSectionSrs, type Rating, type Srs } from './srs'
 
 /** 기록 종류: 기초(하농·피쉬나·스케일) / 자유 / 레퍼토리 구간 / 런스루 */
 export type RefType = Book | 'free' | 'section' | 'run'
@@ -33,7 +34,8 @@ export interface Entry {
   pieceId?: number
   attempts?: number
   successes?: number
-  grade?: Grade
+  grade?: Rating // 간격 복습 평가 (구간·기초)
+  srsKind?: 'new' | 'learn' | 'review' // 평가할 때의 상태 — 기억률 계산에 씀
 }
 
 export interface RoutineItem {
@@ -44,6 +46,7 @@ export interface RoutineItem {
   to: number // 끝 번호 (단일이면 from과 같음)
   title: string // 자유 항목 제목
   minutes: number
+  srs?: boolean // 하농·피쉬나·스케일: 범위 대신 간격 복습으로 오늘 할 것
 }
 
 export interface Score {
@@ -77,7 +80,6 @@ export interface Piece {
 }
 
 /** 구간 단계: 악보 읽기 → 운지 확정 → 느린 템포 → 템포 업 → 암보 → 연주 완성 */
-export type Grade = 'bad' | 'unsure' | 'good'
 
 export interface Section {
   id?: number
@@ -92,11 +94,19 @@ export interface Section {
   streakGoal: number // 연속 성공 기준
   weak: boolean
   page?: number // 악보 PDF 페이지
-  intervalDays: number // 간격 반복 간격
-  dueDate: string // 다음 복습일 YYYY-MM-DD
-  lastGrade?: Grade
-  lastPracticed?: string
+  srs: Srs // 간격 복습
 }
+
+/** 기초 카드: 하농 번호×조 / 피쉬나 번호 / 스케일·아르페지오 조 */
+export interface Card {
+  id: string // cardId()
+  book: Book
+  no: number
+  key?: Key // 하농만
+  srs: Srs
+}
+
+export const cardId = (book: Book, no: number, key?: Key) => (book === 'hanon' ? `hanon:${no}:${key}` : `${book}:${no}`)
 
 export interface RunMark {
   atSec: number
@@ -161,6 +171,7 @@ export const db = new Dexie('piano-practice') as Dexie & {
   recordings: EntityTable<Recording, 'id'>
   ddays: EntityTable<DDay, 'id'>
   lessons: EntityTable<Lesson, 'id'>
+  cards: EntityTable<Card, 'id'>
 }
 
 db.version(1).stores({
@@ -180,6 +191,25 @@ db.version(2).stores({
   ddays: '++id, date',
   lessons: '++id, date'
 })
+
+// 3: Anki 방식 간격 복습 — 구간의 복습 필드를 srs로 묶고, 기초 카드 표를 더한다
+db.version(3)
+  .stores({ sections: '++id, pieceId', cards: 'id, book' })
+  .upgrade(async tx => {
+    await tx.table('sections').toCollection().modify(migrateSection)
+    await tx.table('entries').toCollection().modify((e: Entry) => {
+      if (e.grade) e.grade = migrateGrade(e.grade)
+    })
+  })
+
+/** 옛 구간(백업 포함)을 새 형식으로 */
+export function migrateSection(s: Record<string, unknown>) {
+  if (!s.srs) s.srs = migrateSectionSrs(s)
+  delete s.intervalDays
+  delete s.dueDate
+  delete s.lastGrade
+  delete s.lastPracticed
+}
 
 // ── 설정 ──
 
@@ -202,7 +232,12 @@ export interface Settings {
   hanonBook: BookMap
   pischnaBook: BookMap
   pischnaSplits: number[] // a·b로 나뉜 피쉬나 번호
-  dailyReviewMax: number // 하루 복습 구간 상한
+  dailyReviewMax: number // 레퍼토리: 하루 복습 구간 상한
+  repNewPerDay: number // 레퍼토리: 하루 새 구간
+  cardReviewMax: number // 기초: 책마다 하루 복습 상한
+  cardNewPerDay: number // 기초: 책마다 하루 새 카드
+  maxIvl: number // 최대 간격(일)
+  leechAt: number // '다시' 몇 번이면 고질
   scaleSet: ScaleSet // 저장한 5도권 묶음
 }
 
@@ -217,7 +252,12 @@ export const DEFAULT_SETTINGS: Settings = {
   pischnaBook: { scoreId: null, pages: {} },
   // Schirmer 판(Library of Musical Classics Vol. 792, Wolff·Riemann 편집)에서 a·b로 나뉜 번호
   pischnaSplits: [1, 2, 5, 6, 15, 16, 20],
-  dailyReviewMax: 6,
+  dailyReviewMax: 8,
+  repNewPerDay: 2,
+  cardReviewMax: 10,
+  cardNewPerDay: 3,
+  maxIvl: 60,
+  leechAt: 6,
   scaleSet: { keys: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], start: 0, dir: 'cw', kinds: ['ms', 'ma', 'ns', 'na'] }
 }
 
